@@ -438,7 +438,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div id="header">
 <h1>Configuration</h1>
 <div class="details">
-<span id="revnumber">version 1.12.0.20251126T121227Z</span>
+<span id="revnumber">version 1.12.0.20260129T105917Z</span>
 </div>
 </div>
 <div id="content">
@@ -507,7 +507,6 @@ spring:
       idle-timeout: 300000 # maximum connection idle time (default: 600000ms = 10min)
       max-lifetime: 1800000 # maximum connection lifetime in the pool after close (default: 1800000ms = 30min, mariadb has 60min)
       keepalive-time: 600000 # less than max-lifetime using connection-test-query to probe the DB (default: 0ms == disabled)
-      connection-test-query: select 1 from dual # probe DB according to keepalive-time
   flyway:
     enabled: true
     url: jdbc:mariadb://mariadb:3306
@@ -1048,15 +1047,11 @@ This list is used when the RP does not send any requirements or it&#8217;s used 
 		&lt;/Saml&gt;
 		&lt;!-- use another claim as NameID on CP side --&gt;
 		&lt;SubjectNameMappings preserve="false"&gt;
-			&lt;SubjectName
-					issuer="urn:trustbroker.swiss:idp:SAML-MOCK-2"
-					source="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
-					format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
-			/&gt;
+			&lt;SubjectName claim="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress" format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"/&gt;
 		&lt;/SubjectNameMappings&gt;
 		&lt;!-- CP-side QoA supported mapped from RP-side context classes (100 and 600 not supported by CP) --&gt;
 		&lt;!-- SAML comparisonType=exact is default, minimum is used when RP does not send it,  --&gt;
-		&lt;Qoa enforce="true" comparison="minimum"&gt;
+		&lt;Qoa enforce="true" comparison="MINIMUM"&gt;
 			&lt;ACClass order="099"&gt;urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport&lt;/ACClass&gt;
 			&lt;ACClass order="200"&gt;urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport&lt;/ACClass&gt;
 			&lt;ACClass order="300"&gt;urn:oasis:names:tc:SAML:2.0:ac:classes:MobileTwoFactorContract&lt;/ACClass&gt;
@@ -1267,8 +1262,8 @@ done</pre>
 </div>
 <div id="footer">
 <div id="footer-text">
-Version 1.12.0.20251126T121227Z<br>
-Last updated 2025-11-24 14:54:00 +0100
+Version 1.12.0.20260129T105917Z<br>
+Last updated 2026-01-07 15:34:48 +0100
 </div>
 </div>
 </body>
