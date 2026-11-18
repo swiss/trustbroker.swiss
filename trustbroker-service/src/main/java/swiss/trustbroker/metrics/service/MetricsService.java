@@ -18,10 +18,12 @@ package swiss.trustbroker.metrics.service;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import swiss.trustbroker.audit.dto.EventType;
@@ -65,13 +67,24 @@ public class MetricsService {
 
 	public void increment(EventType eventType, String event, String... tags) {
 		var name = computeNamePrefix(eventType) + event;
+		incrementCounter(name, tags);
+	}
+
+	public void incrementCounter(String name, String... tags) {
 		var counter = Counter.builder(name)
 							 .tags(replaceNullValues(tags))
 							 .register(meterRegistry);
 		counter.increment();
 	}
 
-	private static String computeNamePrefix(EventType eventType) {
+	public void recordTimer(String name, long duration, TimeUnit timeUnit, String... tags) {
+		Timer.builder(name)
+				 .tags(replaceNullValues(tags))
+				 .register(meterRegistry)
+				 .record(duration, timeUnit);
+	}
+
+	static String computeNamePrefix(EventType eventType) {
 		return switch (eventType) {
 			case AUTHN_REQUEST, RESPONSE, LOGOUT_REQUEST, LOGOUT_RESPONSE -> SAML_LABEL;
 			case OIDC_LOGOUT, OIDC_TOKEN_REQUEST, OIDC_TOKEN, OIDC_IDTOKEN -> OIDC_LABEL;

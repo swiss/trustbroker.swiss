@@ -87,8 +87,10 @@ public class WebConfiguration implements WebMvcConfigurer {
 	@Bean
 	public WebServerFactoryCustomizer<TomcatServletWebServerFactory> customizeTomcat(
 			TomcatSessionManager tomcatSessionManager) {
-		return factory -> factory.addContextCustomizers(context ->
-				context.setManager(tomcatSessionManager));
+		return factory -> {
+			factory.addConnectorCustomizers(connector -> connector.setMaxLocaleCount(33));
+			factory.addContextCustomizers(context -> context.setManager(tomcatSessionManager));
+		};
 	}
 
 	@Bean

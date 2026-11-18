@@ -55,6 +55,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.util.MimeType;
+import swiss.trustbroker.common.exception.ExceptionUtil;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.oidc.JwkUtil;
@@ -368,33 +369,54 @@ public class OidcUtil {
 		return ret.toString();
 	}
 
-	public static JWTClaimsSet verifyJwtToken(String jwtToken, Function<String, Optional<JWK>> keySupplier, String clientId) {
+	public static JWTClaimsSet verifyJwtToken(String jwtToken, Function<String, Optional<JWK>> keySupplier, String clientId,
+			boolean requireSignedToken) {
 		try {
 			var jwt = JWTParser.parse(jwtToken);
+			verifyJwtSignature(keySupplier, clientId, jwt, !requireSignedToken);
+			return jwt.getJWTClaimsSet();
+		}
+		catch (ParseException ex) {
+			throw new RequestDeniedException(
+					String.format("Cannot parse JWT token from clientId=%s: %s", clientId, ex.getMessage()), ex);
+		}
+	}
 
+	private static void verifyJwtSignature(Function<String, Optional<JWK>> keySupplier, String clientId, JWT jwt,
+			boolean acceptUnsignedToken) {
+		try {
 			// Plain JWT (not signed) never accepted even if encrypted (encryption as done with a public key, anyone can do this)
+			// unless unsigned JWT is allowed by configuration
 			if (!(jwt instanceof SignedJWT signedJwt)) {
-				throw new RequestDeniedException(
-						String.format("Unsupported JWT type from clientId=%s", clientId));
+				ExceptionUtil.logOrThrow(String.format("Unsupported JWT type from clientId=%s", clientId),
+						acceptUnsignedToken, RequestDeniedException::new);
+				return;
 			}
 
 			var header = signedJwt.getHeader();
 			var kid = header.getKeyID();
 			if (kid == null) {
-				throw new RequestDeniedException(String.format("Missing keyId in token from=%s", clientId));
+				ExceptionUtil.logOrThrow(String.format("Missing keyId in token from=%s", clientId),
+						acceptUnsignedToken, RequestDeniedException::new);
+				return;
 			}
 			var key = keySupplier.apply(kid);
 			if (key.isEmpty()) {
-				throw new RequestDeniedException(String.format("Missing key with keyId=%s from clientId=%s", kid, clientId));
+				ExceptionUtil.logOrThrow(String.format("Missing key with keyId=%s from clientId=%s", kid, clientId),
+						acceptUnsignedToken, RequestDeniedException::new);
+				return;
 			}
 			var verifier = getVerifier(key.get().getKeyType(), key.get(), clientId);
 			if (!signedJwt.verify(verifier)) {
-				throw new RequestDeniedException(String.format("Invalid JWT token from clientId=%s", clientId));
+				ExceptionUtil.logOrThrow(String.format("Invalid JWT token from clientId=%s", clientId),
+						acceptUnsignedToken, RequestDeniedException::new);
+				return;
 			}
-			return jwt.getJWTClaimsSet();
-		} catch (ParseException | JOSEException ex) {
-			throw new TechnicalException(
-					String.format("Cannot parse JWT token from clientId=%s: %s", clientId, ex.getMessage()), ex);
+			log.debug("JWT token from clientId={} verified successfully", clientId);
+		}
+		catch (JOSEException ex) {
+			ExceptionUtil.logOrThrow(String.format("Cannot parse JWT token from clientId=%s: %s", clientId, ex.getMessage()),
+					ex, acceptUnsignedToken, RequestDeniedException::new);
 		}
 	}
 
@@ -483,15 +505,16 @@ public class OidcUtil {
 		return UUID.randomUUID().toString().replace("-", "");
 	}
 
-	public static JWTClaimsSet decryptAndVerifyToken(String token, Function<String, Optional<JWK>> keySupplier, Credential credential, String clientId) {
+	public static JWTClaimsSet decryptAndVerifyToken(String token, Function<String, Optional<JWK>> keySupplier,
+			Credential credential, String clientId, boolean requireSignedToken) {
 		try {
 			JWT jwt = JwtUtil.parseJWT(token);
 			if (jwt instanceof EncryptedJWT) {
 				var decryptJWT = JwtUtil.decryptJwt(token, credential, clientId);
-				return OidcUtil.verifyJwtToken(decryptJWT.getPayload().toString(), keySupplier, clientId);
+				return verifyJwtToken(decryptJWT.getPayload().toString(), keySupplier, clientId, requireSignedToken);
 			}
 			else {
-				return OidcUtil.verifyJwtToken(token, keySupplier, clientId);
+				return verifyJwtToken(token, keySupplier, clientId, requireSignedToken);
 			}
 		}
 		catch (ParseException e) {

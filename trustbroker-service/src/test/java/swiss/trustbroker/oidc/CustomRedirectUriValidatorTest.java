@@ -17,12 +17,15 @@ package swiss.trustbroker.oidc;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
@@ -32,125 +35,158 @@ import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrinci
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import swiss.trustbroker.common.dto.AcceptedUrl;
+import swiss.trustbroker.common.dto.AcceptedUrlFormat;
+import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
+import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
+import swiss.trustbroker.federation.xmlconfig.OidcClient;
 
 @SpringBootTest(classes = CustomRedirectUriValidator.class)
 class CustomRedirectUriValidatorTest {
 
+	@MockitoBean
+	private RelyingPartyDefinitions relyingPartyDefinitions;
+
+	@MockitoBean
+	private TrustBrokerProperties trustBrokerProperties;
+
+	@Autowired
+	private CustomRedirectUriValidator customRedirectUriValidator;
+
 	@Test
 	void testValidateRedirectUri() {
+		var redirectUris = List.of(AcUrl.ofFormat("http://test.trustbroker.swiss/.*", AcceptedUrlFormat.REGEX),
+				AcUrl.of("http://test.trustbroker.swiss"));
 		var registeredClient = RegisteredClient.withId("ANY")
 											   .clientId("clientId")
 											   .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-											   .redirectUris(uris -> uris.addAll(List.of("http://test.trustbroker.swiss/.*", "http://test.trustbroker.swiss")))
+											   .redirectUris(uris -> uris.addAll(redirectUris.stream().map(AcceptedUrl::getUrl).toList()))
 											   .build();
+		mockOidcClient(registeredClient, redirectUris);
 		var token = givenToken(registeredClient);
 
 		assertThrows(OAuth2AuthorizationCodeRequestAuthenticationException.class, () -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, token, "requestedRedirectUri");
 		});
 
 		assertThrows(OAuth2AuthorizationCodeRequestAuthenticationException.class, () -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, token, "http://test3.com");
 		});
 
 		assertThrows(OAuth2AuthorizationCodeRequestAuthenticationException.class, () -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, token, "http://test.trustbroker.swiss:5010");
 		});
 
 		assertThrows(OAuth2AuthorizationCodeRequestAuthenticationException.class, () -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, token, "https://test.trustbroker.swiss");
 		});
 
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "http://test.trustbroker.swiss/#page");
 		});
 
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "http://test.trustbroker.swiss/?#page");
 		});
 
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "http://test.trustbroker.swiss/#?page");
 		});
 
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "http://test.trustbroker.swiss/page");
 		});
 	}
 
+	private void mockOidcClient(RegisteredClient registeredClient, List<AcUrl> redirectUrls) {
+		var whitelist = AcWhitelist.builder()
+								   .acUrls(redirectUrls)
+								   .build();
+		var client = OidcClient.builder()
+							   .id(registeredClient.getClientId())
+							   .redirectUris(whitelist)
+							   .build();
+		when(relyingPartyDefinitions.getOidcClientConfigById(registeredClient.getClientId(), trustBrokerProperties))
+				.thenReturn(Optional.of(client));
+	}
+
 	@Test
 	void testValidateRedirectUriLoopBackAddress() {
+		var redirectUris = List.of(AcUrl.ofFormat("http://test.trustbroker.swiss/.*", AcceptedUrlFormat.REGEX),
+				AcUrl.ofFormat("http://localhost:0/*", AcceptedUrlFormat.ANY),
+				AcUrl.ofFormat("https://localhost:0/*", AcceptedUrlFormat.ANY));
 		var registeredClient = RegisteredClient
 				.withId("ANY")
 				.clientId("clientId")
 				.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-				.redirectUris(uris -> uris.addAll(
-						List.of("http://test.trustbroker.swiss/.*", "http://localhost:0/*", "https://localhost:0/*"))
-				)
+				.redirectUris(uris -> uris.addAll(redirectUris.stream().map(AcceptedUrl::getUrl).toList()))
 				.build();
+		mockOidcClient(registeredClient, redirectUris);
 		var token = givenToken(registeredClient);
 
 		// localhost representations with default ports
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "http://localhost");
 		});
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "https://localhost");
 		});
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, token, "https://localhost.localdomain");
 		});
 
 		// localhost representations with any ports
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "https://localhost:5220");
 		});
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "https://localhost:5220");
 		});
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, null, "https://localhost:5220/");
 		});
 		assertDoesNotThrow(() -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, token, "https://127.0.0.1:5220");
 		});
 
 		// failing
 		assertThrows(OAuth2AuthorizationCodeRequestAuthenticationException.class, () -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, token, "https://localhost.fake.com");
 		});
 	}
 
 	@Test
 	void testValidateRedirectUriInvalidHostName() {
+		var redirectUris = List.of(AcUrl.of("https://zzz.test.any.trustbroker.swiss"),
+				AcUrl.of("https://dev_service-ws.app.trustbroker.swiss/any"));
 		var registeredClient = RegisteredClient.withId("ANY")
 											   .clientId("clientId")
 											   .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-											   .redirectUris(uris -> uris.addAll(List.of(
-													   "https://zzz.test.any.trustbroker.swiss",
-													   "https://dev_service-ws.app.trustbroker.swiss/any"
-											   )))
+											   .redirectUris(uris -> uris.addAll(redirectUris.stream().map(AcceptedUrl::getUrl).toList()))
 											   .build();
-
+		mockOidcClient(registeredClient, redirectUris);
 		var token = givenToken(registeredClient);
 		assertThrows(OAuth2AuthorizationCodeRequestAuthenticationException.class, () -> {
-			CustomRedirectUriValidator.validateRedirectUri(
+			customRedirectUriValidator.validateRedirectUri(
 					registeredClient, token, "https://dev_service-ws.app.ch/any");
 		});
 	}

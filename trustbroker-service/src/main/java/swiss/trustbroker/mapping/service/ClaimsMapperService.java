@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,15 +31,18 @@ import swiss.trustbroker.api.sessioncache.dto.AttributeName;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.xmlconfig.AttributesSelection;
 import swiss.trustbroker.federation.xmlconfig.ClaimsMapper;
 import swiss.trustbroker.federation.xmlconfig.ConstAttributes;
 import swiss.trustbroker.federation.xmlconfig.Definition;
 import swiss.trustbroker.federation.xmlconfig.MultiResultPolicy;
+import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.homerealmdiscovery.util.DefinitionUtil;
 import swiss.trustbroker.mapping.util.AttributeFilterUtil;
+import swiss.trustbroker.oidc.OidcConfigurationUtil;
 import swiss.trustbroker.saml.dto.ClaimSource;
 import swiss.trustbroker.saml.dto.CpResponse;
 import swiss.trustbroker.saml.dto.ResponseParameters;
@@ -59,6 +63,8 @@ public class ClaimsMapperService {
 
 	private final TrustBrokerProperties trustBrokerProperties;
 
+	private final RelyingPartyDefinitions relyingPartyDefinitions;
+
 	/**
 	 * Perform mapping of collected attributes before outputting them to the caller:
 	 * - apply filter by config
@@ -74,7 +80,8 @@ public class ClaimsMapperService {
 
 	private void applyConfigFilter(CpResponse cpResponse, ResponseParameters params, RelyingParty relyingParty) {
 		// filter CP claims on RP side (CP side already done)
-		var claimsSelection = relyingParty.getClaimsSelection();
+		var claimsSelection = getClaimsSelection(cpResponse, relyingParty);
+
 		var rpAttributeDefs = relyingPartySetupService
 				.getRelyingPartyByIssuerIdOrReferrer(params.getRpIssuerId(), params.getRpReferer()).getAttributesDefinitions();
 		var cpAttributes = filterAndCreateCpDefinitions(cpResponse.getAttributes(), rpAttributeDefs, claimsSelection, cpResponse.getIssuer());
@@ -96,6 +103,25 @@ public class ClaimsMapperService {
 		cpResponse.setAttributes(cpAttributes);
 		cpResponse.setUserDetails(userDetails);
 		cpResponse.setProperties(properties);
+	}
+
+	private AttributesSelection getClaimsSelection(CpResponse cpResponse, RelyingParty relyingParty) {
+		var claimsSelection = relyingParty.getClaimsSelection();
+		String oidcClientId = cpResponse.getOidcClientId();
+		if (oidcClientId != null && !oidcClientId.isEmpty() && cpResponse.getOidcScopes() != null && !cpResponse.getOidcScopes().isEmpty()) {
+			Optional<OidcClient> oidcClientOptional = relyingPartyDefinitions.getOidcClientConfigById(oidcClientId, trustBrokerProperties);
+			if (oidcClientOptional.isPresent()) {
+				var oidcClient = oidcClientOptional.get();
+				var allOidcDefinitions = OidcConfigurationUtil.getAllOidcDefinitions(relyingParty, oidcClient, cpResponse.getOidcScopes());
+				var attributesSelection = AttributesSelection.builder().build();
+				attributesSelection.setDefinitions(allOidcDefinitions);
+				if (claimsSelection != null) {
+					attributesSelection.setMultiSourcePolicy(claimsSelection.getMultiSourcePolicy());
+				}
+				claimsSelection = attributesSelection;
+			}
+		}
+		return claimsSelection;
 	}
 
 	// replacement for ConstAttributes (configured Definition having a value)

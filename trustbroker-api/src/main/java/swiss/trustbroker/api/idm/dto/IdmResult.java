@@ -48,6 +48,12 @@ public class IdmResult {
 
 	private int originalUserDetailsCount;
 
+	/**
+	 * Returns the number of user details returned by the last query executed.
+	 * @since 1.16.0
+	 */
+	private int lastQueryUserDetailsCount;
+
 	@Builder.Default
 	private Map<AttributeName, List<String>> properties = new HashMap<>();
 

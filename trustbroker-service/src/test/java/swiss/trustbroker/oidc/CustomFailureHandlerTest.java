@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.AfterEach;
@@ -47,6 +48,7 @@ import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
@@ -98,9 +100,9 @@ class CustomFailureHandlerTest {
 		var rp = RelyingParty.builder().id("rpId").build();
 		var clientId = "client1";
 		var acWhitelist = AcWhitelist.builder()
-									   .acUrls(List.of(RETURN_URL))
+									   .acUrls(List.of(AcUrl.of(RETURN_URL)))
 									   .build();
-		acWhitelist.calculateDerivedUrls();
+		acWhitelist.calculateDerivedUrls(Optional.empty());
 		var client = OidcClient.builder()
 							   .id(clientId)
 							   .redirectUris(acWhitelist)

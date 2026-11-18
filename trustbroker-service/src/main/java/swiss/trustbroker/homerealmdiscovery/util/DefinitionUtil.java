@@ -356,19 +356,6 @@ public class DefinitionUtil {
 		return Collections.emptyList();
 	}
 
-	/**
-	 * First value matching attribute's name by definition's name.
-	 */
-	public static List<String> findValueByName(Map<? extends AttributeName, List<String>> attributes,
-															 String attributeName) {
-		return attributes.entrySet()
-						 .stream()
-						 .filter(entry -> attributeName.equals(entry.getKey().getName()))
-						 .map(Map.Entry::getValue)
-						 .findFirst()
-						 .orElse(Collections.emptyList());
-	}
-
 	public static Map<AttributeName, List<String>> findAttributesByNameStartsWith(Map<? extends AttributeName, List<String>> attributes,
 																				  String attributeName) {
 		return attributes.entrySet()

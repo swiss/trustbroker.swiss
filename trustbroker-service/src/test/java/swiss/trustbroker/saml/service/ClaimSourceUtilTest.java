@@ -47,4 +47,31 @@ class ClaimSourceUtilTest {
 			assertEquals(Optional.of(expectedSource), ClaimSourceUtil.getSecondarySource(source, sourceName));
 		}
 	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"groupList,groupList",
+			"IDM:groupList,IDM",
+			"IDM:rest1:groupList,IDM:rest1",
+			"CP:issuer:uid,CP:issuer",
+			"null,null",
+			"'',''"
+	}, nullValues = "null")
+	void getSourceFromProfileSelectorTest(String profileSelector, String expectedSource) {
+		assertEquals(expectedSource, ClaimSourceUtil.getSourceFromProfileSelector(profileSelector));
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"groupList,groupList",
+			"IDM:groupList,groupList",
+			"IDM:rest1:groupList,groupList",
+			"CP:issuer:uid,uid",
+			"CP:,''",
+			"null,null",
+			"'',''"
+	}, nullValues = "null")
+	void getProfileSelectorTest(String profileSelector, String expectedSelector) {
+		assertEquals(expectedSelector, ClaimSourceUtil.getProfileSelector(profileSelector));
+	}
 }

@@ -21,7 +21,7 @@
 ##
 ## Binding:
 ## XTBHttpMethod - String - HTTP method to use (default: POST)
-## XTBAdditionalFields - List<org.apache.commons.lang3.tuple.Pair> - additional hidden fields
+## XTBAdditionalFields - List<org.apache.commons.lang3.tuple.Pair> - additional hidden fields (key/value are referenced)
 ##
 #set ($onLoad="document.forms[0].submit()")
 <!DOCTYPE html>
@@ -40,7 +40,7 @@
 		<form name="saml.result" action="${action}" method="#if($XTBHttpMethod)${XTBHttpMethod}#{else}POST#end">
 			<div>
 				#foreach($field in $XTBAdditionalFields)
-					<input type="hidden" name="${field.name}" value="$!{field.value}"/>
+					<input type="hidden" name="${field.key}" value="$!{field.value}"/>
 				#end
 			</div>
 			<noscript>

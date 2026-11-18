@@ -232,13 +232,14 @@ public class RelyingPartySetupUtil {
 
 	private static void postInit(RelyingParty relyingParty) {
 		if (relyingParty.getAcWhitelist() != null) {
-			relyingParty.getAcWhitelist().calculateDerivedUrls(); // as we read from XML, constructors and setters were ignore
+			relyingParty.getAcWhitelist().calculateDerivedUrls(Optional.of(relyingParty::invalidate));
+			// as we read from XML, constructors and setters were ignore
 		}
 		// same for OIDC AC lists
 		if (relyingParty.getOidc() != null && relyingParty.getOidc().getClients() != null) {
 			relyingParty.getOidc().getClients().forEach(c -> {
 				if (c.getRedirectUris() != null) {
-					c.getRedirectUris().calculateDerivedUrls();
+					c.getRedirectUris().calculateDerivedUrls(Optional.of(relyingParty::invalidate));
 					if (CollectionUtils.isEmpty(c.getRedirectUris().getRedirectUrls())) {
 						log.error("Invalid rpIssuerId={} oidcClient={} - empty redirect URL list derived from "
 								+ "ACUrls={}", relyingParty.getId(), c.getId(), c.getRedirectUris().getAcUrls());
@@ -877,16 +878,13 @@ public class RelyingPartySetupUtil {
 	private static void mergeIdmQuery(RelyingParty relyingParty, IdmQuery baseIdmQuery) {
 		var idmQuery = getExistingIdmQuery(relyingParty.getIdmLookup(), baseIdmQuery.getName(), baseIdmQuery.getId());
 		if (idmQuery != null) {
-			PropertyUtil.copyAttributeIfMissing(IdmQuery::setOrder, IdmQuery::getOrder, idmQuery, baseIdmQuery);
-			PropertyUtil.copyAttributeIfBlank(IdmQuery::setIssuerNameId, IdmQuery::getIssuerNameId, idmQuery, baseIdmQuery);
-			PropertyUtil.copyAttributeIfBlank(IdmQuery::setIssuerNameIdNS, IdmQuery::getIssuerNameIdNS, idmQuery, baseIdmQuery);
-			PropertyUtil.copyAttributeIfBlank(IdmQuery::setSubjectNameId, IdmQuery::getSubjectNameId, idmQuery, baseIdmQuery);
-			PropertyUtil.copyAttributeIfMissing(IdmQuery::setStatusPolicy, IdmQuery::getStatusPolicy, idmQuery, baseIdmQuery);
-			PropertyUtil.copyAttributeIfBlank(IdmQuery::setClientExtId, IdmQuery::getClientExtId, idmQuery, baseIdmQuery);
-			PropertyUtil.copyAttributeIfBlank(IdmQuery::setAppFilter, IdmQuery::getAppFilter, idmQuery, baseIdmQuery);
-
 			var baseIdmQueryResponseAttributes = baseIdmQuery.getUserDetailsSelection();
 			mergeIdmRespAttributes(idmQuery, baseIdmQueryResponseAttributes);
+			if (idmQuery.getConfiguredQueryControl() == null && baseIdmQuery.getConfiguredQueryControl() != null) {
+				idmQuery.setQueryControl(baseIdmQuery.getConfiguredQueryControl());
+			}
+
+			PropertyUtil.copyMissingAttributes(idmQuery, baseIdmQuery);
 		}
 		else {
 			relyingParty.getIdmLookup()

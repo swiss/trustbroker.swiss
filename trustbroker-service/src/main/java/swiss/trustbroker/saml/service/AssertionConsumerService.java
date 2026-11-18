@@ -15,6 +15,8 @@
 
 package swiss.trustbroker.saml.service;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -23,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
@@ -40,12 +43,15 @@ import org.opensaml.saml.saml2.core.StatusCode;
 import org.opensaml.security.credential.Credential;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.util.UriComponentsBuilder;
 import swiss.trustbroker.api.announcements.dto.Announcement;
 import swiss.trustbroker.api.announcements.service.AnnouncementService;
 import swiss.trustbroker.api.homerealmdiscovery.service.HrdService;
 import swiss.trustbroker.api.saml.dto.DestinationType;
 import swiss.trustbroker.audit.service.AuditService;
 import swiss.trustbroker.audit.service.InboundAuditMapper;
+import swiss.trustbroker.common.dto.AcceptedUrl;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
 import swiss.trustbroker.common.saml.dto.SignatureContext;
@@ -55,11 +61,13 @@ import swiss.trustbroker.common.saml.util.SamlUtil;
 import swiss.trustbroker.common.tracing.TraceSupport;
 import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.common.util.ConfigUtil;
+import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.Banner;
 import swiss.trustbroker.config.dto.GuiFeatures;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
 import swiss.trustbroker.federation.xmlconfig.CounterParty;
@@ -92,6 +100,7 @@ import swiss.trustbroker.sessioncache.dto.StateData;
 import swiss.trustbroker.sessioncache.service.StateCacheService;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.HrdSupport;
+import swiss.trustbroker.util.TxnSupport;
 import swiss.trustbroker.util.WebSupport;
 
 @Service
@@ -341,6 +350,7 @@ public class AssertionConsumerService {
 				var def = DefinitionUtil.findSingleValueByNameOrNamespace(namespaceUri, null, cpAttributeDefinitions);
 				// Fallback necessary only for OriginalAttributes
 				var definition = def.orElseGet(() -> Definition.ofNameAndSource(namespaceUri, ClaimSource.CP.name()));
+				definition = definition.withSource(ClaimSource.CP.name());
 				cpResponse.setAttributes(definition, values); // free to be processed afterward
 				if (CoreAttributeName.AUTH_LEVEL.getNamespaceUri().equals(namespaceUri)) {
 					cpResponse.setAuthLevel(values.getFirst());
@@ -508,19 +518,28 @@ public class AssertionConsumerService {
 		var authnRequestId = authnRequest.getID();
 		SamlUtil.validateSessionId(authnRequestId, "AuthnRequestID used as SP state ID");
 
-		// remember RP for AuthnRequest/response exchange OR as initiator for SSO
+		// Provide some selected HTTP context for AuthnRequest/response exchange (groovy scripts can use HTTPRequest instead)
 		var rpContexts = WebSupport.getHttpContext(request, trustBrokerProperties.getNetwork());
 
+		// Try to remember OIDC scopes in HTTP context as well, see comment on extractScopesFromUrl
+		var oidcScopes = extractScopesFromUrl(referer, request);
+		if (oidcScopes != null) {
+			rpContexts.put(OidcUtil.OIDC_SCOPE, oidcScopes);
+		}
+
+		// QoA handling
 		var qoa = qoaMappingService.getQoaConfiguration(authnRequest.getProviderName(), referer, relyingParty);
-		var dropQoa = qoa != null ? qoa.replaceInboundQoas() : Boolean.FALSE;
+		var dropQoa = qoa != null ? qoa.getReplaceInbound() : Boolean.FALSE;
 		var contextClasses = OpenSamlUtil.extractAuthnRequestContextClasses(authnRequest, dropQoa, QoaMappingUtil.getReplacementAcClasses(qoa));
 		var comparisonType = OpenSamlUtil.extractAuthnRequestComparison(authnRequest);
 		var qoaComparisonType = QoaComparison.ofLowerCase(comparisonType != null ? comparisonType.toString() : null);
 
+		// other context passed on from OIDC endpoint
 		var providerName = authnRequest.getProviderName();
 		var hrdHint = OpenSamlUtil.extractIdpScoping(authnRequest);
+		var rpTxnId = extractRpTxnIdFromUrl(request);
 
-		// support overriding providerName with configured applicationName to resolve problems inconsitent setups
+		// support overriding providerName with configured applicationName to resolve problems inconsistent setups
 		if (relyingParty.getApplicationName() != null) {
 			log.debug("Apply configured applicationName={} overriding providerName={}",
 					relyingParty.getApplicationName(), providerName);
@@ -548,6 +567,7 @@ public class AssertionConsumerService {
 								   .requestBinding(requestBinding)
 								   .requestedResponseBinding(requestedResponseBinding)
 								   .hrdHint(hrdHint)
+								   .txnId(rpTxnId)
 								   .build();
 
 		StateData stateData;
@@ -577,6 +597,35 @@ public class AssertionConsumerService {
 
 		stateCacheService.save(stateData, this.getClass().getSimpleName());
 		return stateData;
+	}
+
+	// Deprecated (99% unused - groovy scripts may be) as it was used on HTTP referer.
+	// Only works when OIDC and SAML run on same DNS name and user-agent plays along sending the HTTP referer.
+	private String extractValueFromUrl(String url, String parameter) {
+		if (url != null && url.contains(parameter)) {
+			try {
+				var uriComponents = UriComponentsBuilder.fromUriString(url).build();
+				MultiValueMap<String, String> queryParams = uriComponents.getQueryParams();
+				if (queryParams.containsKey(parameter) && queryParams.getFirst(parameter) != null) {
+					var value = queryParams.getFirst(parameter);
+					log.debug("Extracted {}={} from url={} (deprecated)", parameter, value, url);
+					return value != null ? URLDecoder.decode(value, StandardCharsets.UTF_8) : null;
+				}
+			}
+			catch (IllegalArgumentException e) {
+				log.info("Ignoring invalid url={} while extracting parameter={} ({})", url, parameter, e.getMessage());
+			}
+		}
+		return null;
+	}
+
+	String extractScopesFromUrl(String referer, HttpServletRequest request) {
+		var ret = extractValueFromUrl(referer, OidcUtil.OIDC_SCOPE);
+		return ret != null ? ret : WebUtil.getParameter(OidcUtil.OIDC_SCOPE, request);
+	}
+
+	String extractRpTxnIdFromUrl(HttpServletRequest request) {
+		return TxnSupport.getRpTxnIdFromRequest(request, trustBrokerProperties);
 	}
 
 	private static Map<String, String> getRpContext(StateData stateData) {
@@ -650,38 +699,9 @@ public class AssertionConsumerService {
 		rpRequest.setClaimsProviders(cpMappings); // because our own reduction logic also might create a new list
 
 		// If groovy script manipulates the classrefs we need dto make sure that this gets persisted
-		updateSpStateDataOnHrdChanges(stateData, rpRequest);
+		ScriptChangeHelper.updateStateOnScriptChanges(stateCacheService, stateData, rpRequest, true);
 
 		return rpRequest;
-	}
-
-	private void updateSpStateDataOnHrdChanges(StateData stateData, RpRequest rpRequest) {
-		if (stateData != null && stateData.getSpStateData() != null) {
-			var spStateData = stateData.getSpStateData();
-			// improve and store RpRequest instead of partial fields only, but it contains complex objects like ClaimsParty
-			var selectableCpIssuerIds = calculateSelectableCpIssuerIds(rpRequest);
-			var changed = !CollectionUtils.isEqualCollection(stateData.getRpContextClasses(), rpRequest.getContextClasses());
-			changed = changed || (spStateData.getApplicationName() != null &&
-					!spStateData.getApplicationName().equals(rpRequest.getApplicationName()));
-			changed = changed || !spStateData.getRpContext().equals(rpRequest.getContext()); // works for String values
-			changed = changed || spStateData.getSelectableCpIssuerIds() == null ||
-					!CollectionUtils.isEqualCollection(spStateData.getSelectableCpIssuerIds(), selectableCpIssuerIds);
-			if (changed) {
-				spStateData.setContextClasses(rpRequest.getContextClasses());
-				spStateData.setComparisonType(rpRequest.getComparisonType());
-				spStateData.getRpContext().putAll(rpRequest.getContext());
-				spStateData.setApplicationName(rpRequest.getApplicationName());
-				spStateData.setSelectableCpIssuerIds(selectableCpIssuerIds);
-				stateCacheService.save(stateData, this.getClass().getSimpleName());
-			}
-		}
-	}
-
-	private static List<String> calculateSelectableCpIssuerIds(RpRequest rpRequest) {
-		if (CollectionUtils.isEmpty(rpRequest.getClaimsProviders())) {
-			return Collections.emptyList();
-		}
-		return rpRequest.getClaimsProviders().stream().map(ClaimsProvider::getId).toList();
 	}
 
 	public void validateSelectedCp(StateData stateDataByAuthnReq, String cpIssuerId) {
@@ -978,8 +998,9 @@ public class AssertionConsumerService {
 					StringUtil.clean(referer), StringUtil.clean(origin), relyingParty.getId(), authnRequest.getID());
 			return;
 		}
-		var perimeterUrls = WebSupport.getOwnOrigins(trustBrokerProperties);
-		List<Collection<String>> allowedUrls = List.of(perimeterUrls, relyingParty.getAcWhitelist().getAcUrls());
+		Set<AcceptedUrl> perimeterUrls = AcUrl.asAcceptedUrlSet(WebSupport.getOwnOrigins(trustBrokerProperties));
+		List<? extends AcceptedUrl> acUrls = relyingParty.getAcWhitelist().getAcUrls();
+		List<Collection<? extends AcceptedUrl>> allowedUrls = List.of(perimeterUrls, acUrls);
 		if (referer != null && !WebUtil.isAllowedReferer(allowedUrls, referer)) {
 			throw new RequestDeniedException(String.format(
 					"referer=%s not accepted for rpIssuerId=%s not matching AcWhitelist or XTB perimeter URLs",

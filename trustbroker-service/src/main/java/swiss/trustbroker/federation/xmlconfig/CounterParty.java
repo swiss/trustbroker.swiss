@@ -144,11 +144,6 @@ public abstract class CounterParty implements PathReference, Serializable {
 		return getEnabled() != FeatureEnum.INVALID;
 	}
 
-	@XmlTransient
-	public boolean isEnabled() {
-		return getEnabled() == FeatureEnum.TRUE;
-	}
-
 	// validation
 
 	public void invalidate(Throwable ex) {
@@ -217,7 +212,7 @@ public abstract class CounterParty implements PathReference, Serializable {
 
 	public boolean forwardRpProtocolBinding() {
 		var saml = getSaml();
-		return saml == null || saml.isForwardRpProtocolBinding();
+		return saml == null || saml.getForwardRpProtocolBinding();
 	}
 
 	public QoaConfig getQoaConfig() {
@@ -330,7 +325,7 @@ public abstract class CounterParty implements PathReference, Serializable {
 			return false;
 		}
 		var oidc = getOidc();
-		return oidc != null && oidc.isEnabled();
+		return oidc != null && oidc.enabled();
 	}
 
 	/**
@@ -349,7 +344,7 @@ public abstract class CounterParty implements PathReference, Serializable {
 		if (saml == null) {
 			return !isOidcEnabled(true);
 		}
-		return saml.isEnabled();
+		return saml.enabled();
 	}
 
 	public List<WsTrustBinding> getSupportedWsTrustBindings(CounterParty baseParty) {
@@ -374,7 +369,7 @@ public abstract class CounterParty implements PathReference, Serializable {
 			return false;
 		}
 		var wsTrust = getWsTrust(baseParty);
-		return wsTrust != null && wsTrust.isEnabled();
+		return wsTrust != null && wsTrust.getEnabled();
 	}
 
 	private WsTrust getWsTrust(CounterParty baseParty) {
@@ -387,6 +382,6 @@ public abstract class CounterParty implements PathReference, Serializable {
 
 	private boolean isWsTrustCounterPartyDefault() {
 		var wsTrust = getWsTrust();
-		return wsTrust != null && wsTrust.isCounterPartyDefault();
+		return wsTrust != null && wsTrust.getCounterPartyDefault();
 	}
 }

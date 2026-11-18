@@ -22,14 +22,26 @@ import java.util.Map;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ldap.core.ContextMapper;
 import org.springframework.ldap.core.DirContextAdapter;
+import swiss.trustbroker.ldap.util.LdapAttributeUtil;
 
+/** Maps all values of an LDAP context to XML-safe strings. */
+@Slf4j
 public class LdapAttributeMapper implements ContextMapper<Map<String, List<String>>> {
 
 	@Override
 	public Map<String, List<String>> mapFromContext(Object ctx) throws NamingException {
-		final var context = (DirContextAdapter) ctx;
+		if (ctx == null) {
+			throw new NamingException(String.format("Unexpected LDAP context type=%s expected=%s",
+					"null", DirContextAdapter.class.getName()));
+		}
+		if (!(ctx instanceof DirContextAdapter context)) {
+			var actualType = ctx.getClass().getName();
+			throw new NamingException(String.format("Unexpected LDAP context type=%s expected=%s",
+					actualType, DirContextAdapter.class.getName()));
+		}
 		Map<String, List<String>> attributeMap = new HashMap<>();
 		final var attributes = context.getAttributes().getAll();
 		while (attributes.hasMore()) {
@@ -39,10 +51,17 @@ public class LdapAttributeMapper implements ContextMapper<Map<String, List<Strin
 
 			NamingEnumeration<?> vals = attribute.getAll();
 			while (vals.hasMore()) {
-				values.add(vals.next().toString());
+				var value = vals.next();
+				if (value != null) {
+					values.add(LdapAttributeUtil.toXmlSafeString(id, value));
+				}
+				else {
+					log.warn("LDAP attribute {} has null value, skipping", id);
+				}
 			}
 			attributeMap.put(id, values);
 		}
 		return attributeMap;
 	}
 }
+

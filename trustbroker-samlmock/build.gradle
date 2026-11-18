@@ -59,6 +59,10 @@ task deleteCaches(type: Delete) {
 jib {
 	from {
 		image = rootProject.baseImage
+		auth {
+			username = project.repoUser
+			password = project.repoPass
+		}
 	}
 	to {
 		image = rootProject.dockerRegistry + '/trustbroker-swiss/trustbroker-samlmock'

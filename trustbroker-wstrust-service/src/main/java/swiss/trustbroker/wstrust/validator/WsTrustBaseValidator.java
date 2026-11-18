@@ -24,12 +24,14 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Pair;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Audience;
 import org.opensaml.security.credential.Credential;
 import org.opensaml.soap.wstrust.RequestSecurityToken;
 import org.springframework.util.CollectionUtils;
 import org.w3c.dom.Element;
+import swiss.trustbroker.api.sessioncache.dto.AttributeName;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.StandardErrorCode;
 import swiss.trustbroker.common.exception.TechnicalException;
@@ -196,7 +198,9 @@ public abstract class WsTrustBaseValidator implements WsTrustValidator {
 		}
 		var signature = soapMessageHeader.getSignature();
 		var signatureElement = signature != null ? signature.getDOM() : null;
-		if (!SoapUtil.isSignatureValid(element, signatureElement, trustCredentials)) {
+		var idAttributes = getIdAttributes();
+		var acceptedSignedElements = getAcceptedSignedElements();
+		if (!SoapUtil.isSignatureValid(element, signatureElement, idAttributes, acceptedSignedElements, trustCredentials)) {
 			if (requireSignature) {
 				throw new RequestDeniedException(
 						String.format("Signature validation failed for element=%s", element.getNodeName()));
@@ -244,5 +248,17 @@ public abstract class WsTrustBaseValidator implements WsTrustValidator {
 
 	protected List<String> getAllowedSignatureAlgorithms(CounterParty cp) {
 		return cp.getAllowedSignatureAlgorithms(trustBrokerProperties.getSecurity().getAllowedSignatureAlgorithms());
+	}
+
+	protected List<Pair<String, String>> getIdAttributes() {
+		return mapAttributeNamesToPair(trustBrokerProperties.getWstrust().getSignatureIdAttributes());
+	}
+
+	protected List<Pair<String, String>> getAcceptedSignedElements() {
+		return mapAttributeNamesToPair(trustBrokerProperties.getWstrust().getAcceptedSignedElements());
+	}
+
+	private static List<Pair<String, String>> mapAttributeNamesToPair(List<? extends AttributeName> attributes) {
+		return attributes.stream().map(attr -> Pair.of(attr.getNamespaceUri(), attr.getName())).toList();
 	}
 }

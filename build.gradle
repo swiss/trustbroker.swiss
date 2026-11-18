@@ -1,7 +1,7 @@
 buildscript {
 	ext {
 		top = ''
-		buildVersion = '1.15.0'
+		buildVersion = '1.16.0'
 		buildTimestamp = null
 		// build promotion
 		buildName = System.env.BUILD_NAME
@@ -18,13 +18,13 @@ buildscript {
 plugins {
 	id 'base'
 	// https://central.sonatype.com/artifact/org.springframework.boot/spring-boot/versions
-	id 'org.springframework.boot' version '4.0.7' apply false
+	id 'org.springframework.boot' version '4.1.2' apply false
 	// https://plugins.gradle.org/plugin/org.ajoberstar.grgit
 	id 'org.ajoberstar.grgit' version '4.1.1' apply true
 	// https://plugins.gradle.org/plugin/org.unbroken-dome.test-sets
 	id "org.unbroken-dome.test-sets" version '4.1.0' apply false
 	// https://central.sonatype.com/artifact/com.google.cloud.tools/jib-maven-plugin/versions
-	id 'com.google.cloud.tools.jib' version '3.5.1' apply false
+	id 'com.google.cloud.tools.jib' version '3.5.2' apply false
 	// https://github.com/node-gradle/gradle-node-plugin
 	id "com.github.node-gradle.node" version "7.1.0" apply false
 	// https://plugins.gradle.org/plugin/com.jfrog.artifactory
@@ -46,6 +46,14 @@ subprojects {
 		mavenCentral()
 		maven {
 			url 'https://build.shibboleth.net/maven/releases'
+		}
+	}
+
+	// settings.gradle's ext {} isn't visible to sub-projects, so define repoUser/repoPass here instead, unless the monorepo already set them
+	ext {
+		if (!project.hasProperty('repoUser')) {
+			repoUser = System.env.REPO_USER ?: 'anonymous'
+			repoPass = System.env.REPO_TOKEN ?: 'anonymous'
 		}
 	}
 
@@ -104,17 +112,10 @@ subprojects {
 				mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
 				// spring-cloud: https://spring.io/projects/spring-cloud
 				// https://central.sonatype.com/artifact/org.springframework.cloud/spring-cloud-dependencies/versions
-				mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2025.1.1'
+				mavenBom 'org.springframework.cloud:spring-cloud-dependencies:2025.1.3'
 			}
 			// dependency management for libraries used in multiple components
 			dependencies {
-				// tomcat upgrade AHEAD of spring-boot/4.1.1 (remove on upgrade to this version and consider JwtGenerator:160 Date issue)
-				dependency 'org.apache.tomcat.embed:tomcat-embed-core:11.0.23'
-				dependency 'org.apache.tomcat.embed:tomcat-embed-el:11.0.23'
-				dependency 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.23'
-				dependency 'org.apache.httpcomponents.core5:httpcore5:5.4.3'
-				dependency 'org.apache.httpcomponents.core5:httpcore5-h2:5.4.3'
-
 				// opensaml
 				// https://build.shibboleth.net/maven/releases/org/opensaml/opensaml-core/
 				// https://shibboleth.atlassian.net/wiki/spaces/IDP5/pages/3199500367/ReleaseNotes
@@ -133,10 +134,14 @@ subprojects {
 				// https://central.sonatype.com/artifact/org.apache.cxf/apache-cxf/versions
 				// https://central.sonatype.com/artifact/com.sun.xml.messaging.saaj/saaj-impl/versions
 				// NOTE: WS-import from wsdl not managed here, see trustbroker-wstrust-service for that.
-				dependencySet(group: 'org.apache.cxf', version: '4.2.2') {
+				dependencySet(group: 'org.apache.cxf', version: '4.2.3') {
 					entry 'cxf-rt-transports-http'
 					entry 'cxf-rt-frontend-jaxws'
 				}
+
+				// Apache CXF upgraded from 4.2.2 to 4.2.3 to pick up newer transitive dependencies and reduce CVE exposure.
+				// Additional overrides are required until fixed versions are provided transitively by upstream dependencies.
+				dependency 'org.apache.neethi:neethi:3.2.4'
 
 				// git integration
 				// https://central.sonatype.com/artifact/org.eclipse.jgit/org.eclipse.jgit/versions
@@ -156,9 +161,9 @@ subprojects {
 				// state cache feature
 				// https://central.sonatype.com/artifact/org.mariadb.jdbc/mariadb-java-client/versions
 				// https://mariadb.com/kb/en/mariadb-connector-j-release-notes/
-				dependency 'org.mariadb.jdbc:mariadb-java-client:3.5.8'
+				dependency 'org.mariadb.jdbc:mariadb-java-client:3.5.10'
 				// https://central.sonatype.com/artifact/org.postgresql/postgresql/versions
-				dependency 'org.postgresql:postgresql:42.7.12'
+				dependency 'org.postgresql:postgresql:42.7.13'
 
 				// script support
 				// dependency 'org.codehaus.groovy:groovy-all' is too much for security so reduce to the max
@@ -175,7 +180,7 @@ subprojects {
 				// JCE provider
 				// https://www.bouncycastle.org/latest_releases.html
 				// https://central.sonatype.com/artifact/org.bouncycastle/bcprov-jdk18on/versions
-				dependencySet(group: 'org.bouncycastle', version: '1.84') {
+				dependencySet(group: 'org.bouncycastle', version: '1.86') {
 					entry 'bcprov-jdk18on'
 					entry 'bcpkix-jdk18on'
 				}
@@ -184,21 +189,21 @@ subprojects {
 				// https://central.sonatype.com/artifact/org.apache.wss4j/wss4j-ws-security-common/versions
 				// https://central.sonatype.com/artifact/org.apache.wss4j/wss4j-ws-security-web/versions
 				// https://central.sonatype.com/artifact/org.apache.wss4j/wss4j-ws-security-dom/versions
-				dependency('org.apache.wss4j:wss4j-ws-security-common:3.0.5') {
+				dependency('org.apache.wss4j:wss4j-ws-security-common:3.0.6') {
 					exclude group: 'org.opensaml', name: 'opensaml-core'
 				}
 				dependency 'org.apache.wss4j:wss4j-ws-security-web:3.0.5'
-				dependency 'org.apache.wss4j:wss4j-ws-security-dom:3.0.5'
+				dependency 'org.apache.wss4j:wss4j-ws-security-dom:3.0.6'
 
 				// exclude old opensaml stuff from spring-security too
 				// https://central.sonatype.com/artifact/org.springframework.security/spring-security-saml2-service-provider/versions
-				dependency('org.springframework.security:spring-security-saml2-service-provider:7.0.5') {
+				dependency('org.springframework.security:spring-security-saml2-service-provider:7.1.1') {
 					exclude group: 'org.opensaml', name: 'opensaml-core'
 				}
 
 				// monitoring
 				// https://central.sonatype.com/artifact/io.micrometer/micrometer-registry-prometheus/versions
-				dependency 'io.micrometer:micrometer-registry-prometheus:1.16.5'
+				dependency 'io.micrometer:micrometer-registry-prometheus:1.17.1'
 
 				// JAX-WS
 				// https://central.sonatype.com/artifact/org.glassfish.jaxb/jaxb-xjc/versions
@@ -208,6 +213,14 @@ subprojects {
 					entry 'jaxb-xjc'
 					entry 'jaxb-runtime'
 				}
+
+				// Jackson security overrides (CVE-2026-110879)
+				// Remove once upstream dependencies provide fixed versions.
+				dependency 'tools.jackson.core:jackson-core:3.1.8'
+				dependency 'tools.jackson.core:jackson-databind:3.1.8'
+
+				dependency 'com.fasterxml.jackson.core:jackson-core:2.21.8'
+				dependency 'com.fasterxml.jackson.core:jackson-databind:2.21.8'
 			}
 		}
 
@@ -280,6 +293,8 @@ subprojects {
 
 	plugins.withType(JacocoPlugin).tap {
 		configureEach {
+			// Sonar reads build/reports/jacoco/test/jacocoTestReport.xml, which is not generated by default
+			tasks.named('test') { finalizedBy tasks.named('jacocoTestReport') }
 			tasks.withType(JacocoReport).tap {
 				configureEach { task ->
 					task.with {

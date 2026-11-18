@@ -111,6 +111,8 @@ public class WsFedService {
 			RelyingParty relyingParty, WsFedRequestData requestData) {
 		var authnRequest = SamlFactory.createRequest(AuthnRequest.class, relyingParty.getId());
 		authnRequest.setAssertionConsumerServiceURL(requestData.getReplyUrl());
+		// WS-Fed does not supply the destination, but the SAML validation checks it, use actual request URL:
+		authnRequest.setDestination(request.getRequestURL().toString());
 		authnRequest.setForceAuthn(requestData.getForceAuth());
 		var authLevel = requestData.getAuthLevel();
 		if (authLevel != null) {
@@ -130,6 +132,8 @@ public class WsFedService {
 			RelyingParty relyingParty, WsFedRequestData requestData) {
 		// NameId unknown with WS-Fed
 		var logoutRequest = SamlFactory.createLogoutRequest(relyingParty.getId(), trustBrokerProperties.getPerimeterUrl(), null);
+		// WS-Fed does not supply the destination, but the SAML validation checks it, use actual request URL:
+		logoutRequest.setDestination(request.getRequestURL().toString());
 		var signatureContext = SignatureContext.forWsFed(null);
 		signatureContext.setRequireSignature(false); // internal object, never serialized
 		relyingPartyService.handleLogoutRequest(outputServices, logoutRequest, null, request, response, signatureContext);

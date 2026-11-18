@@ -43,7 +43,6 @@ import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.service.XmlConfigStatusService;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderSetup;
-import swiss.trustbroker.util.DefaultUtil;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.RelyingPartySetup;
@@ -56,6 +55,7 @@ import swiss.trustbroker.oidc.ClientConfigInMemoryRepository;
 import swiss.trustbroker.oidc.OidcEncryptionKeystoreService;
 import swiss.trustbroker.oidc.cache.service.OidcMetadataCacheService;
 import swiss.trustbroker.script.service.ScriptService;
+import swiss.trustbroker.util.DefaultHandler;
 
 @Service
 @AllArgsConstructor
@@ -95,6 +95,8 @@ public class AppConfigService {
 	private final CredentialService credentialService;
 
 	private final OidcEncryptionKeystoreService oidcEncryptionKeystoreService;
+
+	private final DefaultHandler defaultHandler;
 
 	public int checkAndUpdate() {
 		var changed = mustUpdateFiles();
@@ -187,7 +189,7 @@ public class AppConfigService {
 		checkAndLoadCpCertificates(claimsProviderSetup);
 		validateScripts(claimsProviderSetup);
 		filterInvalidClaimsParties(claimsProviderSetup);
-		DefaultUtil.applyCpDefaults(claimsProviderSetup);
+		defaultHandler.applyCpDefaults(claimsProviderSetup);
 		relyingPartyDefinitions.setClaimsProviderSetup(claimsProviderSetup);
 
 		if (ssoGroupSetup != null) {
@@ -201,7 +203,7 @@ public class AppConfigService {
 		checkAndLoadRelyingPartyCertificates(relyingPartySetup);
 		checkRpSsoIntegrity(relyingPartySetup, ssoGroupSetup);
 		filterInvalidRelyingParties(relyingPartySetup);
-		DefaultUtil.applyRpDefaults(relyingPartySetup);
+		defaultHandler.applyRpDefaults(relyingPartySetup);
 		relyingPartyDefinitions.setRelyingPartySetup(relyingPartySetup);
 		relyingPartyDefinitions.loadOidcConfiguration(trustBrokerProperties.getOidc());
 		relyingPartyDefinitions.loadAccessRequestConfigurations();

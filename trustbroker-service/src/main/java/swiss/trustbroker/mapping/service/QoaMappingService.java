@@ -176,7 +176,7 @@ public class QoaMappingService {
 				case MINIMUM, BETTER -> QoaComparison.MAXIMUM; // RP requested min -> pick max Qoa from CP response
 			};
 		// restrict RP response to single QoA?
-		if (outboundQoaConfig.hasConfig() && outboundQoaConfig.config().useSingleQoaInResponse() &&
+		if (outboundQoaConfig.hasConfig() && outboundQoaConfig.config().getSingleQoaResponse() &&
 				requestComparisonType == QoaComparison.EXACT) {
 			log.debug("Using comparison MAXIMUM instead of EXACT matching originalContextClasses={} when calculating outbound "
 							+ "classes towards issuerId={} to enforce singleQoaResponse",
@@ -213,9 +213,10 @@ public class QoaMappingService {
 
 		// Don't apply mapping or order validation on default
 		if (mappedQoas.isEmpty() && inboundQoaConfig.hasConfig() && inboundQoaConfig.config().getDefaultQoa() != null)  {
-			mappedQoas.add(inboundQoaConfig.config().getDefaultQoa());
+			mappedQoas = List.of(inboundQoaConfig.config().getDefaultQoa());
 			log.debug("Mapped responseContextClasses={} set to defaultQoa={} inboundIssuer={} outboundIssuer={} ",
-					responseContextClasses, inboundQoaConfig.config().getDefaultQoa(), inboundQoaConfig.issuerId(), inboundQoaConfig.issuerId());
+					responseContextClasses, inboundQoaConfig.config().getDefaultQoa(), inboundQoaConfig.issuerId(),
+					outboundQoaConfig.issuerId());
 		}
 
 		return mappedQoas;
@@ -232,7 +233,7 @@ public class QoaMappingService {
 			log.debug("Missing outbound Qoa config outboundIssuer={}, skipping Qoa mapping", outboundQoaConfig.issuerId());
 			return inboundContextClasses;
 		}
-		if (!outboundQoaConfig.config().mapOutbound()) {
+		if (!outboundQoaConfig.config().getMapOutbound()) {
 			log.debug("Qoa config not outbound for outboundIssuer={}, skipping Qoa mapping", outboundQoaConfig.issuerId());
 			return inboundContextClasses;
 		}
@@ -240,7 +241,7 @@ public class QoaMappingService {
 		List<AcClass> mappedQoas = new ArrayList<>();
 		List<AcClass> unmappedQoas = new ArrayList<>();
 		var globalMapping = trustBrokerProperties.getQoaMap();
-		var dropUnmappableQoas = outboundQoaConfig.config().dropUnmappableQoas();
+		var dropUnmappableQoas = outboundQoaConfig.config().getDropUnmappable();
 		// map inbound context class to outbound context class
 		for (var contextClass : inboundContextClasses) {
 			var qoaOrders = QoaMappingUtil.getQoaOrders(contextClass, inboundQoaConfig, globalMapping, false);
@@ -258,7 +259,13 @@ public class QoaMappingService {
 
 		// drop only if dropUnmappable=true and there is at least one mappable Qoa
 		if (!dropUnmappableQoas || mappedQoas.isEmpty()) {
+			log.debug("dropUnmappableQoas={} mappedQoas={} retaining unmappedQoas={}",
+					dropUnmappableQoas, mappedQoas, unmappedQoas);
 			mappedQoas.addAll(unmappedQoas);
+		}
+		else {
+			log.debug("dropUnmappableQoas={} mappedQoas={} dropping unmappedQoas={}",
+					dropUnmappableQoas, mappedQoas, unmappedQoas);
 		}
 
 		var configQoa = new QoaConfig(Qoa.builder()

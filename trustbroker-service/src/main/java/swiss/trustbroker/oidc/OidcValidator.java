@@ -47,11 +47,13 @@ public class OidcValidator {
 
 	private static final String JWT_TOKEN_TYPE_VALUE = "urn:ietf:params:oauth:token-type:jwt";
 
+
 	public static void validateClaimsProviderMapping(RelyingParty relyingParty, ClaimsParty claimsParty, String errorUri) {
 		var claimsProviderMappings = relyingParty.getClaimsProviderMappings();
 		if (claimsProviderMappings == null) {
 			var message = String.format("Missing ClaimsProviderMappings for RelyingParty=%s", relyingParty.getId());
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT,
+					CustomOAuth2ErrorCodes.ERROR_MSG_UNAUTHORIZED_CLIENT, message, errorUri);
 			return;
 		}
 		var claimsProviderList = claimsProviderMappings.getClaimsProviderList();
@@ -60,7 +62,8 @@ public class OidcValidator {
 									 .findAny();
 		if (rpCp.isEmpty()) {
 			var message = String.format("Missing ClaimsProviderMapping for ClaimParty=%s in RelyingParty=%s", claimsParty.getId(), relyingParty.getId());
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.UNAUTHORIZED_CLIENT,
+					CustomOAuth2ErrorCodes.ERROR_MSG_UNAUTHORIZED_CLIENT, message, errorUri);
 		}
 	}
 
@@ -68,7 +71,8 @@ public class OidcValidator {
 										   OAuth2TokenExchangeAuthenticationToken tokenExchangeAuthentication, String errorUri) {
 		if (rpOidcClient == null || registeredClient == null) {
 			var message = String.format("Missing OIDC client configuration for token exchange clientId=%s", registeredClientId);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, message, errorUri);
 			return;
 		}
 
@@ -78,7 +82,8 @@ public class OidcValidator {
 
 		if (!registeredClient.getAuthorizationGrantTypes().contains(AuthorizationGrantType.TOKEN_EXCHANGE)) {
 			var message = String.format("Missing authorization grant type for token exchange authentication clientId=%s", registeredClientId);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_GRANT, message, errorUri);
 		}
 
 		if (JWT_TOKEN_TYPE_VALUE.equals(tokenExchangeAuthentication.getRequestedTokenType()) && !OAuth2TokenFormat.SELF_CONTAINED.equals(registeredClient.getTokenSettings().getAccessTokenFormat())) {
@@ -95,7 +100,8 @@ public class OidcValidator {
 
 		if ((hasRequestedAudiences && noConfiguredAudiences) || (allowedAud != null && (audiences == null || !allowedAud.containsAll(audiences)))) {
 			var message = String.format("Audiences=%s are not matching configured audience=%s", audiences, configAudiences);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_AUDIENCE, message, errorUri);
 		}
 	}
 
@@ -109,7 +115,8 @@ public class OidcValidator {
 
 		if ((hasRequestedResources && noConfiguredResources) || (allowedResources != null && (resources == null || !allowedResources.containsAll(requested)))) {
 			var message = String.format("Resources=%s are not matching configured resources=%s", resources, configResources);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_RESOURCE, message, errorUri);
 		}
 
 		for (String resource : requested) {
@@ -127,7 +134,8 @@ public class OidcValidator {
 		var uri = WebUtil.getValidatedUri(resource);
 		if (uri == null || uri.getScheme() == null || uri.getFragment() != null || uri.getAuthority() == null) {
 			var message = String.format("Invalid resource url=%s", resource);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_RESOURCE, message, errorUri);
 		}
 	}
 
@@ -146,7 +154,8 @@ public class OidcValidator {
 			var message = String.format("Expired OIDC %s expiration time %s=%s for client=%s",
 					OAuth2ParameterNames.SUBJECT_TOKEN, OidcUtil.OIDC_EXPIRATION_TIME, expirationTime,
 					oidcClient.getId());
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_TOKEN, message, errorUri);
 		}
 
 		var notBefore = claimsSet.getNotBeforeTime();
@@ -155,7 +164,8 @@ public class OidcValidator {
 		if (!validNotBefore(notBefore, now, notBeforeToleranceSec)) {
 			var message = String.format("OIDC %s valid not before %s=%s for client=%s",
 					OAuth2ParameterNames.SUBJECT_TOKEN, OidcUtil.OIDC_NOT_BEFORE, notBefore, oidcClient.getId());
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_TOKEN, message, errorUri);
 		}
 	}
 
@@ -168,12 +178,14 @@ public class OidcValidator {
 		var iat = tokenIat.getTime();
 		if (iat > now) {
 			var message = String.format("token is in the future client=%s iat=%s > now", clientId, tokenIat);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_TOKEN, message, errorUri);
 		}
 		if (now - iat > (maxAgeSex * 1000L)) {
 			var message = String.format("Token is too old for client=%s iat=%s. Allowed tolerance seconds=%s",
 					clientId, tokenIat, maxAgeSex);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN, message, errorUri);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_TOKEN, message, errorUri);
 		}
 	}
 

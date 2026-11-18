@@ -40,7 +40,6 @@ import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.exception.GlobalExceptionHandler;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderDefinitions;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderSetup;
-import swiss.trustbroker.util.DefaultUtil;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.RelyingPartySetup;
 import swiss.trustbroker.homerealmdiscovery.service.WebResourceProvider;
@@ -48,6 +47,7 @@ import swiss.trustbroker.homerealmdiscovery.util.ClaimsProviderUtil;
 import swiss.trustbroker.homerealmdiscovery.util.RelyingPartySetupUtil;
 import swiss.trustbroker.oidc.cache.service.OidcMetadataCacheService;
 import swiss.trustbroker.script.service.ScriptService;
+import swiss.trustbroker.util.DefaultHandler;
 
 /**
  * Initialize everything based on the spring container's initialization procedure.
@@ -80,6 +80,8 @@ public class ApplicationInitializer {
 	private final WebResourceProvider resourceProvider;
 
 	private final OidcMetadataCacheService oidcMetadataCacheService;
+
+	private final DefaultHandler defaultHandler;
 
 	@EventListener(ContextRefreshedEvent.class)
 	@PostConstruct
@@ -140,8 +142,8 @@ public class ApplicationInitializer {
 		appConfigService.filterInvalidRelyingParties(relyingPartySetup);
 		appConfigService.filterInvalidClaimsParties(claimsProviderSetup);
 
-		DefaultUtil.applyRpDefaults(relyingPartySetup);
-		DefaultUtil.applyCpDefaults(claimsProviderSetup);
+		defaultHandler.applyRpDefaults(relyingPartySetup);
+		defaultHandler.applyCpDefaults(claimsProviderSetup);
 
 		// assembly
 		relyingPartyDefinitions.setClaimsProviderDefinitions(claimsProviderDefinitions);

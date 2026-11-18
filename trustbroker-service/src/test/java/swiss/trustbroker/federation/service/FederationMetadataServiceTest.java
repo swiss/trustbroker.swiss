@@ -126,6 +126,7 @@ class FederationMetadataServiceTest {
 		ar.setServiceUrl(ARP_URL);
 		ar.setIndex(ARP_INDEX);
 		var saml = new SamlProperties();
+		saml.setEnabled(true);
 		saml.setConsumerUrl(CONSUMER_URL);
 		saml.setArtifactResolution(ar);
 		trustBrokerProperties.setSaml(saml);

@@ -24,7 +24,6 @@ import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
-import jakarta.xml.bind.annotation.XmlTransient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,11 +41,12 @@ import lombok.NoArgsConstructor;
 public class Oidc implements Serializable {
 
 	/**
-	 * SAML protocol enabled.
+	 * OIDC protocol enabled.
 	 * <br/>
-	 * Default: true (for backwards compatibility)
+	 * Default: true
 	 * @since 1.14.0
 	 */
+	@Default("true")
 	@XmlAttribute(name = "enabled")
 	private Boolean enabled;
 
@@ -57,8 +57,8 @@ public class Oidc implements Serializable {
 	@Builder.Default
 	private List<OidcClient> clients = new ArrayList<>();
 
-	@XmlTransient
-	public boolean isEnabled() {
+	// used during configuration, where @Default is not yet set
+	public boolean enabled() {
 		return enabled == null || enabled;
 	}
 }

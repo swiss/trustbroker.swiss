@@ -97,7 +97,10 @@ public enum CoreAttributeName implements MutableAttributeName {
 	SSO_SESSION_ID("SsoSessionId", true, null, null, null),
 
 	// Allow federation tracking via message attribute/claim
-	CONVERSATION_ID("ConversationId", true, null, null, null);
+	CONVERSATION_ID("ConversationId", true, null, null, null),
+
+	// Allow relying parties to send a transaction ID and get it back as a claim/attribute in tokens/assertions
+	TXN_ID("RpTxnId", true, null, null, null);
 
 	private final String name;
 

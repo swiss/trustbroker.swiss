@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,6 +27,7 @@ import java.util.Optional;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
@@ -37,10 +37,21 @@ import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
+import swiss.trustbroker.oidc.jackson.ObjectMapperFactory;
 import swiss.trustbroker.oidc.session.HttpExchangeSupport;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 @AllArgsConstructor
+@Slf4j
 public class TokenExchangeResponseCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
+
+	// For generic claim-string JSON parsing (secured: polymorphic types restricted to java.lang/java.util)
+	private static final JsonMapper JSON_MAPPER = ObjectMapperFactory.securedObjectMapper();
+
+	private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+
+	private static final TypeReference<List<Map<String, Object>>> LIST_MAP_TYPE = new TypeReference<>() {};
 
 	private final RelyingPartyDefinitions relyingPartyDefinitions;
 
@@ -105,69 +116,91 @@ public class TokenExchangeResponseCustomizer implements OAuth2TokenCustomizer<Jw
 			context.getJwsHeader().keyId(kid);
 		}
 	}
-	private void addAttributesToContext(JwtEncodingContext context) {
-
+	private static void addAttributesToContext(JwtEncodingContext context) {
 		Object tokenData = getTokenAttributes(context);
-		if (tokenData == null) return;
+		if (tokenData == null) {
+			return;
+		}
 		if (!(tokenData instanceof Map<?, ?> tokenMap)) {
 			return;
 		}
 
-		tokenMap.forEach((key, value) -> {
-			if (!(key instanceof String keyValue)) {
-				return;
-			}
-			if (value == null) return;
-			if (value instanceof Instant instantValue) {
-				context.getClaims().claim(keyValue, instantValue.getEpochSecond());
-			}
-			else if (value instanceof Date dateValue) {
-				context.getClaims().claim(keyValue, dateValue.toInstant().getEpochSecond());
-			}
-			else if (value instanceof String || value instanceof Number || value instanceof Boolean) {
-				context.getClaims().claim(keyValue, value);
-			}
-			else if (value instanceof Collection<?> values) {
-				List<String> safe = values.stream()
-				                          .map(String::valueOf)
-				                          .toList();
-				context.getClaims().claim(keyValue, convertStringToMap(safe));
-
-			}
-			// "cnf" claim
-			else if (value instanceof Map<?, ?> map) {
-				context.getClaims().claim(keyValue, map);
-			}
-		});
-
+		tokenMap.forEach((key, value) -> addAttributeToContext(context, key, value));
 	}
 
-	// Workaround until the Map claim fix
-	Object convertStringToMap(List<String> values) {
-		if (values == null || values.size() != 1 || values.getFirst() == null) {
-			return values;
+	private static void addAttributeToContext(JwtEncodingContext context, Object key, Object value) {
+		if (!(key instanceof String keyValue)) {
+			return;
 		}
-		String value = values.getFirst();
-		if (!value.startsWith("{") || !value.endsWith("}")) {
-			return values;
+		if (value == null) {
+			return;
 		}
-
-		String body = value.substring(1, value.length() - 1).trim();
-		if (body.isEmpty()) {
-			return Map.of();
+		if (value instanceof Instant instantValue) {
+			context.getClaims().claim(keyValue, instantValue.getEpochSecond());
 		}
-
-		Map<String, String> map = new HashMap<>();
-
-		for (String entry : body.split(", ")) {
-			String[] kv = entry.split("=", 2);
-			if (kv.length != 2) {
-				return value; // malformed → keep original
+		else if (value instanceof Date dateValue) {
+			context.getClaims().claim(keyValue, dateValue.toInstant().getEpochSecond());
+		}
+		else if (value instanceof String stringValue) {
+			// Attempt to deserialize back JSON-encoded objects (Map or List of Maps)
+			context.getClaims().claim(keyValue, tryParseJson(stringValue));
+		}
+		else if (value instanceof Number || value instanceof Boolean) {
+			context.getClaims().claim(keyValue, value);
+		}
+		else if (value instanceof Collection<?> values) {
+			List<String> safe = values.stream().map(String::valueOf).toList();
+			if (safe.size() == 1) {
+				Object parsed = tryParseJson(safe.getFirst());
+				// Only unwrap if it actually deserialized to an object/list - otherwise keep original list
+				context.getClaims().claim(keyValue, parsed != safe.getFirst() ? parsed : safe);
 			}
-			map.put(kv[0], kv[1]);
+			else {
+				context.getClaims().claim(keyValue, safe);
+			}
+		}
+		// "cnf" claim and other raw maps pass through unchanged
+		else if (value instanceof Map<?, ?> map) {
+			context.getClaims().claim(keyValue, map);
+		}
+	}
+
+	/**
+	 * If the string is a JSON object or array of objects, deserialize it back to the corresponding Java object.
+	 * Otherwise, return the string unchanged.
+	 */
+	static Object tryParseJson(String value) {
+		if (value == null) {
+			return null;
+		}
+		String trimmed = value.trim();
+		if (trimmed.isEmpty()) {
+			return value;
+		}
+		if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+			return value;
 		}
 
-		return map;
+		// Only treat arrays as JSON payloads when they start with an object: [{...}] (with optional whitespace)
+		if (trimmed.startsWith("[") && !trimmed.matches("^\\[\\s*\\{.*")) {
+			return value;
+		}
+
+		// Reject polymorphic payloads
+		if (trimmed.contains("@class") || trimmed.contains("@type")) {
+			log.warn("Rejected polymorphic JSON payload");
+			return value;
+		}
+		try {
+			if (trimmed.startsWith("{")) {
+				return JSON_MAPPER.readValue(trimmed, MAP_TYPE);
+			}
+			return JSON_MAPPER.readValue(trimmed, LIST_MAP_TYPE);
+		}
+		catch (Exception e) {
+			log.debug("String claim is not JSON, keeping as-is: {} {}", e.getClass().getSimpleName(), e.getMessage());
+			return value;
+		}
 	}
 
 	private static Object getTokenAttributes(JwtEncodingContext context) {

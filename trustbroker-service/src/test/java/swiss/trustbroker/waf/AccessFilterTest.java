@@ -24,9 +24,11 @@ import java.util.List;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -59,6 +61,16 @@ class AccessFilterTest {
 		trustBrokerProperties.setPerimeterUrl(PERIMETER_URL);
 		trustBrokerProperties.setBlockedHeaderNames(List.of("X-Injected-Script", "X-Custom-Exploit"));
 		accessFilter = new AccessFilter(trustBrokerProperties);
+	}
+
+	@Test
+	void testOidcDisabled() throws Exception {
+		var request = new MockHttpServletRequest();
+		request.setRequestURI("/oauth2/authorize");
+		var response = new MockHttpServletResponse();
+		var chain = new MockFilterChain();
+		accessFilter.doFilter(request, response, chain);
+		assertThat(response.getStatus(), is(HttpStatus.NOT_FOUND.value()));
 	}
 
 	@ParameterizedTest
@@ -133,12 +145,14 @@ class AccessFilterTest {
 			"/../../../../../windows/win.ini,404"
 	})
 	void testAccess(String path, int expectedStatus) throws Exception {
+		trustBrokerProperties.getOidc().setEnabled(true);
+		accessFilter = new AccessFilter(trustBrokerProperties);
 		var request = new MockHttpServletRequest();
 		request.setRequestURI(path);
 		var response = new MockHttpServletResponse();
 		var chain = new MockFilterChain();
 		accessFilter.doFilter(request, response, chain);
-		assertThat("Access on path " +path, response.getStatus(), is(expectedStatus));
+		assertThat("Access on path " + path, response.getStatus(), is(expectedStatus));
 		validateChainCall(path, expectedStatus, chain, request);
 	}
 
@@ -181,7 +195,7 @@ class AccessFilterTest {
 		var response = new MockHttpServletResponse();
 		var chain = new MockFilterChain();
 		accessFilter.doFilter(request, response, chain);
-		assertThat("Access on path " +path, response.getStatus(), is(expectedStatus));
+		assertThat("Access on path " + path, response.getStatus(), is(expectedStatus));
 		validateChainCall(path, expectedStatus, chain, request);
 	}
 
@@ -218,7 +232,7 @@ class AccessFilterTest {
 		var response = new MockHttpServletResponse();
 		var chain = new MockFilterChain();
 		accessFilter.doFilter(request, response, chain);
-		assertThat("Access on path " +path, response.getStatus(), is(expectedStatus));
+		assertThat("Access on path " + path, response.getStatus(), is(expectedStatus));
 		validateChainCall(path, expectedStatus, chain, request);
 	}
 
@@ -228,10 +242,12 @@ class AccessFilterTest {
 			"'','',200",
 			// unrelated parameter present -> allowed
 			"SAMLRequest,payload,200",
-			// default blocked parameter @class with a value -> blocked
+			// default blocked parameter @class/@type with a value -> blocked
 			"@class,java.lang.String,404",
-			// @class present even with empty value -> blocked (non-null getParameter result)
-			"@class,'',404"
+			"@type,java.lang.String,404",
+			// @class/@type present even with empty value -> blocked (non-null getParameter result)
+			"@class,'',404",
+			"@type,'',404"
 	})
 	void testBlockedRequestParameter(String paramName, String paramValue, int expectedStatus) throws Exception {
 		var request = new MockHttpServletRequest();

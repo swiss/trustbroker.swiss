@@ -74,7 +74,7 @@ public class SessionTxWrapper {
 		}
 	}
 
-	private boolean oidcPromptNoneRedirectDone(HttpServletRequest request, HttpServletResponse response) throws IOException {
+	boolean oidcPromptNoneRedirectDone(HttpServletRequest request, HttpServletResponse response) throws IOException {
 		if (OidcUtil.isOidcPromptNone(request)) {
 			var clientId = OidcSessionSupport.getOidcClientId(request, relyingPartyDefinitions);
 			var session = HttpExchangeSupport.getRunningHttpSession();
@@ -91,7 +91,7 @@ public class SessionTxWrapper {
 				return false;
 			}
 			var acl = client.get().getRedirectUris();
-			if (acl != null && UrlAcceptor.isRedirectUrlOkForAccess(redirectUri, acl.getAcNetUrls())) {
+			if (acl != null && UrlAcceptor.isRedirectUrlOkForAccess(redirectUri, acl.getAcUrls())) {
 				var state = StringUtil.clean(request.getParameter(OidcUtil.OIDC_STATE_ID));
 				var traceId = TraceSupport.getOwnTraceParent();
 				var errorPage = apiSupport.getErrorPageUrl(StandardErrorCode.REQUEST_DENIED.getLabel(), traceId);

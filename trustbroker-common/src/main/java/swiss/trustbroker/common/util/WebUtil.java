@@ -45,6 +45,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.util.UriComponentsBuilder;
+import swiss.trustbroker.common.dto.AcceptedUrl;
 import swiss.trustbroker.common.dto.CookieParameters;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.Base64Util;
@@ -373,7 +374,15 @@ public class WebUtil {
 
 	private static String htmlEncodeValue(String value, boolean htmlEncodeParameters) {
 		value = value != null ? urlDecodeValue(value) : null;
-		return htmlEncodeParameters ? HTMLEncoder.encodeForHTMLAttribute(value) : value;
+		return htmlEncodeParameters ? htmlEncodeValue(value) : value;
+	}
+
+	public static String htmlEncodeValue(String value) {
+		return HTMLEncoder.encodeForHTMLAttribute(value);
+	}
+
+	public static String doubleHtmlEncodeValue(String value) {
+		return HTMLEncoder.encodeForHTMLAttribute(HTMLEncoder.encodeForHTMLAttribute(value));
 	}
 
 	public static Cookie createCookie(CookieParameters params) {
@@ -670,14 +679,13 @@ public class WebUtil {
 	 * @return true if the URL is in the allowed list, ignoring the path (which origin would not have, and for referer we do
 	 * not care about).
 	 */
-	public static boolean isAllowedOriginOrReferer(Collection<String> allowedUrls, String originOrReferer,
+	public static boolean isAllowedOriginOrReferer(Collection<? extends AcceptedUrl> allowedUrls, String originOrReferer,
 			String validatedOriginOrReferer) {
-		var allowedUrlSet = CollectionUtil.collectionAsSet(allowedUrls);
-		return UrlAcceptor.isTrustedOrigin(validatedOriginOrReferer, allowedUrlSet) ||
-				UrlAcceptor.isTrustedOrigin(originOrReferer, allowedUrlSet);
+		return UrlAcceptor.isTrustedOrigin(validatedOriginOrReferer, allowedUrls) ||
+				UrlAcceptor.isTrustedOrigin(originOrReferer, allowedUrls);
 	}
 
-	private static boolean isOriginOrRefererInSets(Collection<Collection<String>> allowedUrlSets,
+	private static boolean isOriginOrRefererInSets(Collection<Collection<? extends AcceptedUrl>> allowedUrlSets,
 			String originOrReferer, String validatedOriginOrReferer) {
 		for (var allowedUrls : allowedUrlSets) {
 			if (isAllowedOriginOrReferer(allowedUrls, originOrReferer, validatedOriginOrReferer)) {
@@ -688,13 +696,13 @@ public class WebUtil {
 	}
 
 	// convenience method with multiple sets of URLs
-	public static boolean isAllowedOrigin(Collection<Collection<String>> allowedUrlSets, String origin) {
+	public static boolean isAllowedOrigin(Collection<Collection<? extends AcceptedUrl>> allowedUrlSets, String origin) {
 		var validOrigin = getValidOrigin(origin);
 		return isOriginOrRefererInSets(allowedUrlSets, origin, validOrigin);
 	}
 
 	// convenience method with multiple sets of URLs
-	public static boolean isAllowedReferer(Collection<Collection<String>> allowedUrlSets, String referer) {
+	public static boolean isAllowedReferer(Collection<Collection<? extends AcceptedUrl>> allowedUrlSets, String referer) {
 		var validReferer = Objects.toString(getValidatedUri(referer), null);
 		return isOriginOrRefererInSets(allowedUrlSets, referer, validReferer);
 	}

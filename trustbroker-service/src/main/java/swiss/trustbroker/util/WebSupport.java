@@ -29,6 +29,7 @@ import java.util.stream.Stream;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import net.shibboleth.shared.net.URLBuilder;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -380,4 +381,77 @@ public class WebSupport {
 		}
 		return oidcPerimeterUrl.startsWith(validReferer);
 	}
+
+	/**
+	 * @param protocol protocol for which this check is done, just for logging
+	 * @param allowedNetworks from protocol-specific config
+	 * @param enforceClientNetwork from protocol-specific config
+	 * @param network global config
+	 * @param request optional, read from thread local if null
+	 * @return true if the request is allowed from the network according to the configured network header
+	 * and restrictions.
+	 */
+	public static boolean isNetworkAllowed(String protocol, List<String> allowedNetworks, boolean enforceClientNetwork,
+			NetworkConfig network, HttpServletRequest request) {
+		if (CollectionUtils.isEmpty(allowedNetworks)) {
+			return true;
+		}
+		if (request == null) {
+			request = getWebRequest();
+		}
+		if (request == null) {
+			// used outside request context - error in the implementation
+			throw new TechnicalException(String.format(
+					"Missing HttpServletRequest, cannot restrict %s to allowedNetworks=%s",
+					protocol, allowedNetworks));
+		}
+		var clientNetwork = getClientNetwork(request, network);
+		if (clientNetwork == null) {
+			// mismatch between configuration and network header injection
+			throw new RequestDeniedException(String.format("Client network not known, cannot restrict %s to allowedNetworks=%s"
+					+ " - this option must only be used if your network always injects the networkHeader, otherwise drop it",
+					protocol, allowedNetworks));
+		}
+		var allowedNetwork = allowedNetworks.contains(clientNetwork);
+		if (allowedNetwork) {
+			log.debug("Access to {} allowed from clientNetwork={} for allowedNetworks={}", protocol, clientNetwork, allowedNetworks);
+			return true;
+		}
+		if (enforceClientNetwork) {
+			log.error("Access to {} blocked from clientNetwork={} for allowedNetworks={}", protocol, clientNetwork, allowedNetworks);
+			return false;
+		}
+		log.warn("Access to {} allowed from clientNetwork={} despite allowedNetworks={}", protocol, clientNetwork, allowedNetworks);
+		return true;
+	}
+
+	/**
+	 * @param protocol protocol for which this check is done, just for logging
+	 * @param clientIpRegex from protocol-specific config
+	 * @param enforceClientIp from protocol-specific config
+	 * @param clientIp from request
+	 * @return true if the request is allowed from the IP according to the configured regex.
+	 */
+	public static boolean isClientIpAllowed(String protocol, String clientIpRegex, boolean enforceClientIp, String clientIp) {
+		if (StringUtils.isEmpty(clientIpRegex)) {
+			return true;
+		}
+		if (clientIp == null) {
+			// mismatch between configuration and client IP injection
+			throw new RequestDeniedException(String.format("Missing clientIp, cannot restrict %s to allowedClientIpRegex=%s",
+					protocol, clientIpRegex));
+		}
+		var allowedIp = clientIp.matches(clientIpRegex);
+		if (allowedIp) {
+			log.debug("Access to {} allowed from clientIp={} for allowedClientIpRegex={}", protocol, clientIp, clientIpRegex);
+			return true;
+		}
+		if (enforceClientIp) {
+			log.error("Access to {} blocked from clientIp={} for allowedClientIpRegex={}", protocol, clientIp, clientIpRegex);
+			return false;
+		}
+		log.warn("Access to {} allowed from clientIp={} despite allowedClientIpRegex={}", protocol, clientIp, clientIpRegex);
+		return true;
+	}
+
 }

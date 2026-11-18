@@ -45,7 +45,10 @@ public class AnnouncementRpConfig implements Serializable, AnnouncementsRpData {
 
 	/**
 	 * Enable this configuration.
+	 * <br/>
+	 * Default: true (since 1.16.0, false before)
  	 */
+	@Default("true")
 	@XmlAttribute(name = "enabled")
 	private Boolean enabled;
 
@@ -58,6 +61,6 @@ public class AnnouncementRpConfig implements Serializable, AnnouncementsRpData {
 	@JsonIgnore
 	@Override
 	public boolean isAnnouncementEnabled() {
-		return Boolean.TRUE.equals(enabled);
+		return enabled;
 	}
 }

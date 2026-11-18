@@ -89,6 +89,32 @@ class WebUtilTest {
 	}
 
 	@ParameterizedTest
+	@MethodSource
+	void testHtmlEncodeValue(String value, String expected) {
+		assertThat(WebUtil.htmlEncodeValue(value), is(expected));
+	}
+
+	static Object[][] testHtmlEncodeValue() {
+		return new Object[][] {
+				{ null, null },
+				{ "x\"y", "x&quot;y" }
+		};
+	}
+
+	@ParameterizedTest
+	@MethodSource
+	void testDoubleHtmlEncodeValue(String value, String expected) {
+		assertThat(WebUtil.doubleHtmlEncodeValue(value), is(expected));
+	}
+
+	static Object[][] testDoubleHtmlEncodeValue() {
+		return new Object[][] {
+				{ null, null },
+				{ "x\"y", "x&amp;quot&#x3b;y" }
+		};
+	}
+
+	@ParameterizedTest
 	@CsvSource(value = {
 			",false,false",
 			"'',false,true",
@@ -548,4 +574,6 @@ class WebUtilTest {
 	void testGetBearerAuthorizationHeader(String token, String expected) {
 		assertThat(WebUtil.getBearerAuthorizationHeader(token), CoreMatchers.is(expected));
 	}
+
+
 }

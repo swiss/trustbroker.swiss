@@ -226,7 +226,7 @@ public class OidcMockTestData {
 	}
 
 	public static ClaimsParty givenCpWithOidcClient(OidcClient client) {
-		var oidc = Oidc.builder().clients(List.of(client)).build();
+		var oidc = Oidc.builder().enabled(true).clients(List.of(client)).build();
 		var email = Definition.builder()
 							  .name(CLAIM_EMAIL)
 							  .build();

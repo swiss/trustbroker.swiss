@@ -38,11 +38,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
 import org.opensaml.saml.saml2.core.Assertion;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -113,7 +113,7 @@ import swiss.trustbroker.saml.util.AssertionValidator;
 @Slf4j
 public class CustomOAuth2TokenExchangeAuthenticationProvider implements AuthenticationProvider {
 
-	private static final String ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-5.2";
+	private static final String ERROR_URI = CustomOAuth2ErrorCodes.ACCESS_TOKEN_REQUEST_ERROR_URI;
 
 	private static final String JWT_TOKEN_TYPE_VALUE = "urn:ietf:params:oauth:token-type:jwt";
 
@@ -134,8 +134,6 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 	private static final String REQUEST_SUBJECT_TOKEN_TYPE = "subject_token_type";
 
 	private static final String REQUEST_REQUESTED_TOKEN_TYPE = "requested_token_type";
-
-	private static final String REQUEST_ADDITIONAL_PARAMS = "requested_additional_params";
 
 	private final ClientConfigInMemoryRepository registeredClientRepository;
 
@@ -210,7 +208,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 
 					// subject_token validating with CP config
 					var key = oidcMetadataCacheService.jwtKeySupplier(claimsParty);
-					jwtClaimsSet = OidcUtil.verifyJwtToken(subjectToken, key, claimsParty.getId());
+					jwtClaimsSet = OidcUtil.verifyJwtToken(subjectToken, key, claimsParty.getId(),
+							trustBrokerProperties.getSecurity().isRequireSignedExchangeToken());
 					validateClaimSet(jwtClaimsSet, claimsParty);
 					subjectTokenClaims = new HashMap<>(jwtClaimsSet.getClaims());
 
@@ -223,7 +222,10 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 				}
 			}
 			catch (JwtException ex) {
-				CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT, ex.getMessage(), ERROR_URI);
+				CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT,
+						CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_GRANT,
+						String.format("Subject token validation failed for clientId=%s: %s", registeredClientId, ex.getMessage()),
+						ERROR_URI);
 				return null;
 			}
 		}
@@ -232,7 +234,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 			validateTokenAuthorization(subjectAuthorizationToken, subjectTokenType);
 			if (subjectAuthorizationToken == null || subjectAuthorizationToken.getClaims() == null) {
 				var message = String.format("SubjectAuthorization token is null for client %s", claimsParty.getId());
-				CustomOAuth2EndpointUtils.throwErrorWithMessage(INVALID_REQUEST, message, ERROR_URI);
+				CustomOAuth2EndpointUtils.throwErrorWithMessage(INVALID_REQUEST,
+						CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, message, ERROR_URI);
 				return null;
 			}
 			subjectTokenClaims = new HashMap<>(subjectAuthorizationToken.getClaims());
@@ -240,12 +243,14 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 		}
 		else {
 			var message = String.format("Token exchange disabled with external tokens clientId=%s", registeredClientId);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, message, ERROR_URI);
 			return null;
 		}
 
 		if (jwtClaimsSet == null) {
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN, "Missing subject claim", ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_TOKEN, "Missing subject claim", ERROR_URI);
 			return null;
 		}
 
@@ -324,12 +329,14 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 			// Check and use internal actor token (provided earlier towards relying parties).
 			// External actors are blocked before.
 			if (subjectAuthorization == null && trustBrokerProperties.getOidc().isExternalTokenExchangeEnabled()) {
-				CustomOAuth2EndpointUtils.throwErrorWithMessage(INVALID_REQUEST, "actor_token authorization not supported", ERROR_URI);
+				CustomOAuth2EndpointUtils.throwErrorWithMessage(INVALID_REQUEST,
+						CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, "actor_token authorization not supported", ERROR_URI);
 			}
 			return getOAuth2AuthorizationWithActorToken(tokenExchangeAuthentication, authorizedActorClaims);
 		}
 		else if (authenticationActorToken != null) {
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(INVALID_REQUEST, "actor_token without may_act claim", ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, "actor_token without may_act claim", ERROR_URI);
 		}
 		return null;
 	}
@@ -381,7 +388,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 
 		if (subjectTokenCount != null && subjectTokenCount >= subjectTokenMaxUseCount) {
 			var message = String.format("subject_token can not be reused for client=%s. Max allowed usage=%s", oidcClient.getId(), subjectTokenMaxUseCount);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN, message, ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_TOKEN,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_TOKEN, message, ERROR_URI);
 		}
 
 		var iat = jwtClaimsSet.getIssueTime();
@@ -398,7 +406,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 				Boolean.FALSE.equals(rpOidcClient.getOidcSecurityPolicies().getAllowPublicClientTokenExchange())) {
 			var message = String.format("Missing authentication params for client=%s. " +
 					"Received PublicClientAuthenticationToken but ClientSecret is expected", rpOidcClient.getId());
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, message, ERROR_URI);
 		}
 	}
 
@@ -427,7 +436,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 	static void validateClaimSet(JWTClaimsSet jwtClaimsSet, ClaimsParty claimsParty) {
 		if (jwtClaimsSet == null) {
 			var message = String.format("Claims are null in token for client %s", claimsParty.getId());
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, message, ERROR_URI);
 		}
 	}
 
@@ -459,7 +469,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 	static void isValidTokenData(Map<String, Object> tokenData, RelyingParty relyingParty, ClaimsParty claimsParty) {
 		if (tokenData.isEmpty()) {
 			var message = String.format("No token data found for subject token. In relyingParty=%s claims=%s", relyingParty.getId(), claimsParty);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.ACCESS_DENIED, message, ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.ACCESS_DENIED,
+					CustomOAuth2ErrorCodes.ERROR_MSG_ACCESS_DENIED, message, ERROR_URI);
 		}
 	}
 
@@ -467,7 +478,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 		var subject = assertion.getSubject();
 		if (subject == null || subject.getNameID() == null) {
 			var message = String.format("Missing SAML2 assertion subject for token exchange clientId=%s", registeredClientId);
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, message, ERROR_URI);
 			return null;
 		}
 
@@ -498,7 +510,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 		}
 		else if (oidcClient.getScopes() == null) {
 			var message = String.format("Scopes are missing in=%s, configured", oidcClient.getId());
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST, message, ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_REQUEST,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_REQUEST, message, ERROR_URI);
 		}
 		else {
 			requestParams.put(REQUEST_SCOPE, new LinkedHashSet<>(Set.of(OidcScopes.OPENID)));
@@ -572,7 +585,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 			}
 		}
 		else if (authorizedActorClaims != null) {
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT, "authorized_actor_claim", ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_GRANT, "authorized_actor_claim", ERROR_URI);
 		}
 		return actorAuthorization;
 	}
@@ -592,7 +606,8 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 			token = tokenGenerator.generate(tokenContext);
 			if (token == null) {
 				var message = "The token generator failed to generate the access token.";
-				CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.SERVER_ERROR, message, ERROR_URI);
+				CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.SERVER_ERROR,
+						CustomOAuth2ErrorCodes.ERROR_MSG_SERVER_ERROR, message, ERROR_URI);
 			}
 		}
 
@@ -657,13 +672,15 @@ public class CustomOAuth2TokenExchangeAuthenticationProvider implements Authenti
 
 	static void validateClaims(Map<String, Object> expectedClaims, Map<String, Object> actualClaims, String... claimNames) {
 		if (actualClaims == null) {
-			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT, "actor_claim", ERROR_URI);
+			CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT,
+					CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_GRANT, "actor_claim", ERROR_URI);
 			return;
 		}
 
 		for (String claimName : claimNames) {
 			if (!Objects.equals(expectedClaims.get(claimName), actualClaims.get(claimName))) {
-				CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT, claimName, ERROR_URI);
+				CustomOAuth2EndpointUtils.throwErrorWithMessage(OAuth2ErrorCodes.INVALID_GRANT,
+						CustomOAuth2ErrorCodes.ERROR_MSG_INVALID_GRANT, claimName, ERROR_URI);
 			}
 		}
 	}

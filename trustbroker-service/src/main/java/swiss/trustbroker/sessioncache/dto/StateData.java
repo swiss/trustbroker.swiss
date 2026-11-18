@@ -20,8 +20,10 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
@@ -32,9 +34,12 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.annotation.Id;
 import swiss.trustbroker.api.sessioncache.dto.SessionState;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
+import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.federation.xmlconfig.QoaComparison;
 import swiss.trustbroker.saml.dto.CpResponse;
 
@@ -122,6 +127,8 @@ public class StateData implements Serializable, SessionState {
 
 	private String hrdHint;
 
+	private String txnId;
+
 	private Timestamp expirationTimestamp; // lifetime as seen by reaper
 
 	@Builder.Default
@@ -163,6 +170,11 @@ public class StateData implements Serializable, SessionState {
 	@JsonIgnore
 	public String getRpHrdHint() {
 		return (spStateData != null) ? spStateData.hrdHint : hrdHint;
+	}
+
+	@JsonIgnore
+	public String getRpTxnId() {
+		return (spStateData != null && spStateData.txnId != null) ? spStateData.txnId : txnId;
 	}
 
 	@JsonIgnore
@@ -269,12 +281,28 @@ public class StateData implements Serializable, SessionState {
 		targetCpResponse.setRpContext(sourceState.getRpContext());
 		targetCpResponse.setRpReferer(sourceState.getReferer());
 		targetCpResponse.setRpContextClasses(sourceState.getContextClasses());
+		var oidcScopes = setOidcScopes(targetCpResponse, sourceState);
 		// propagate applicationName and OIDC client_id for scripting
-		log.debug("Switch rpIssuer={} CPResponse data from oldApplicationName={} to applicationName={}",
+		log.debug("Switch rpIssuer={} CPResponse data from oldApplicationName={} to applicationName={} oidcScopes={}",
 				targetCpResponse.getRpIssuer(), targetCpResponse.getApplicationName(),
-				sourceState.getApplicationName());
+				sourceState.getApplicationName(), oidcScopes);
 		targetCpResponse.setOidcClientId(sourceState.getOidcClientId());
 		targetCpResponse.setApplicationName(sourceState.getApplicationName());
+	}
+
+	static @Nullable String setOidcScopes(CpResponse targetCpResponse, StateData sourceState) {
+		String oidcScopes = null;
+		if (sourceState.getRpContext() != null) {
+			oidcScopes = sourceState.getRpContext().get(OidcUtil.OIDC_SCOPE);
+			if (StringUtils.isNotBlank(oidcScopes)) {
+				var parsedScopes = java.util.Arrays.stream(StringUtils.split(oidcScopes))
+				                                   .collect(Collectors.toCollection(LinkedHashSet::new));
+				if (!parsedScopes.isEmpty()) {
+					targetCpResponse.setOidcScopes(parsedScopes);
+				}
+			}
+		}
+		return oidcScopes;
 	}
 
 }

@@ -31,6 +31,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -180,6 +181,17 @@ class DirectoryUtilTest {
 		directoryUtil.copyDir(from.getAbsolutePath(), to.getAbsolutePath());
 		assertTrue(sub.exists());
 		assertTrue(toSub.exists());
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"null,/any/path,/any/path",
+			"/base,/any/path,/any/path",
+			"/base,/base/config/test.xml,/base/config/test.xml",
+			"/base,config/test.xml,/base/config/test.xml"
+	}, nullValues = "null")
+	void absoluteFile(String basePath, String filePath, String expectedPath) {
+		assertThat(DirectoryUtil.absoluteFile(basePath, filePath).getPath(), is(expectedPath));
 	}
 
 	private File existingDir(File parent, String name) {

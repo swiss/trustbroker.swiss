@@ -69,8 +69,9 @@ import swiss.trustbroker.mapping.dto.QoaSpec;
 import swiss.trustbroker.mapping.util.QoaMappingUtil;
 import swiss.trustbroker.sessioncache.dto.StateData;
 import swiss.trustbroker.test.saml.util.SamlTestBase;
+import swiss.trustbroker.util.DefaultHandler;
 
-@SpringBootTest(classes = {QoaMappingService.class})
+@SpringBootTest(classes = { QoaMappingService.class, DefaultHandler.class })
 class QoaMappingServiceTest {
 
 	private static final String RP_ID = "rp1";
@@ -86,6 +87,9 @@ class QoaMappingServiceTest {
 	private static final String CP_QOA_20 = "cpQoa20";
 
 	private static final String DEFAULT_QOA_70 = SamlTestBase.Qoa.CONTEXT_CLASS_PREFIX + 70;
+
+	@Autowired
+	private DefaultHandler defaultHandler;
 
 	@Autowired
 	private QoaMappingService qoaMappingService;
@@ -183,6 +187,7 @@ class QoaMappingServiceTest {
 									 AcClass.builder().order(2).contextClass(mappedClass2).build(),
 									 AcClass.builder().order(3).contextClass(mappedClass3).build()))
 							 .build();
+		defaultHandler.applyDefaultValues(outBoundQoa);
 		var outBoundQoaConf = new QoaConfig(outBoundQoa, outboundIssuer);
 		List<String> result = qoaMappingService.mapInboundToOutboundQoas(
 				contextClasses, inboundQoaConf, QoaComparison.EXACT, outBoundQoaConf, Collections.emptyList());
@@ -243,6 +248,7 @@ class QoaMappingServiceTest {
 									 AcClass.builder().order(1).contextClass(mappedClass1).build(),
 									 AcClass.builder().order(2).contextClass(mappedClass2).build()))
 							 .build();
+		defaultHandler.applyDefaultValues(outBoundQoa);
 		var outBoundQoaConf = new QoaConfig(outBoundQoa, "outboundIssuer");
 		Map<String, Integer> globalMapping = Map.of("class1", 1, "class2", 2, "class3", 3);
 		when(trustBrokerProperties.getQoaMap()).thenReturn(globalMapping);
@@ -289,6 +295,7 @@ class QoaMappingServiceTest {
 	void mapRequestQoasToOutboundTest() {
 		var inboundClasses = List.of(RP_QOA_10, RP_QOA_20);
 		var rpQoa = Qoa.builder().build();
+		defaultHandler.applyDefaultValues(rpQoa);
 		var rpQoaConfig = new QoaConfig(rpQoa, RP_ID);
 		var comparison = QoaComparison.EXACT;
 
@@ -297,6 +304,7 @@ class QoaMappingServiceTest {
 					   .singleQoaResponse(true) // ignored
 					   .classes(List.of(AcClass.builder().contextClass(CP_QOA_10).order(10).build()))
 					   .build();
+		defaultHandler.applyDefaultValues(cpQoa);
 		var cpQoaConfig = new QoaConfig(cpQoa, CP_ID);
 
 		// no inbound classes
@@ -350,6 +358,7 @@ class QoaMappingServiceTest {
 							   )
 					   )
 					   .build();
+		defaultHandler.applyDefaultValues(cpQoa);
 		var cpQoaConfig = new QoaConfig(cpQoa, CP_ID);
 		var rpQoa = Qoa.builder()
 					   .classes(
@@ -359,6 +368,7 @@ class QoaMappingServiceTest {
 							   )
 					   )
 					   .build();
+		defaultHandler.applyDefaultValues(rpQoa);
 		var rpQoaConfig = new QoaConfig(rpQoa, RP_ID);
 
 		// no mapping with empty RP Qoa
@@ -427,6 +437,8 @@ class QoaMappingServiceTest {
 	@MethodSource
 	void canCpFulfillRequestQoasTest(QoaComparison comparison, List<String> requestedContextClasses,
 									 Qoa rpQoa, Qoa cpQoa, boolean expected) {
+		defaultHandler.applyDefaultValues(rpQoa);
+		defaultHandler.applyDefaultValues(cpQoa);
 		mockGlobalQoaMap();
 		assertThat(qoaMappingService.canCpFulfillRequestQoas(comparison, requestedContextClasses,
 						new QoaConfig(rpQoa, RP_ID), new QoaConfig(cpQoa, CP_ID)),

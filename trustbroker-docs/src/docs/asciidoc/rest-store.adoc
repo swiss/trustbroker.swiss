@@ -1,0 +1,301 @@
+= REST Store
+
+The REST store is a component that retrieves attributes from a REST (SCIM-style) HTTP endpoint.
+It supports chained queries so that an attribute returned by an earlier query can be used as input for a subsequent one.
+
+== Configuration
+
+=== Global parameters (`application.yml`)
+
+[cols="2,4,1,1,2"]
+|===
+| Parameter | Description | Type | Required | Example
+
+| ``trustbroker.config.rest.enabled``
+| Activates the entire REST store sub-system. +
+  If missing (or set to ``false``), REST beans are not loaded.
+| Boolean
+| no (default ``false``)
+| ``true``
+
+| ``trustbroker.config.rest.services.<name>.baseUrl``
+| Static base URL of the REST endpoint for that named service. +
+  Must *not* contain placeholders or query parameters — those belong in ``AppFilter``.
+| String
+| yes
+| ``https://scim.example.org/v2``
+
+| ``trustbroker.config.rest.services.<name>.authentication.method``
+| Authentication mode for the selected service: ``NONE``, ``BASIC``, ``BEARER``, ``CERTIFICATE``.
+| String
+| no (default ``NONE``)
+| ``BEARER``
+
+| ``trustbroker.config.rest.services.<name>.authentication.username``
+| Username for ``BASIC`` authentication of the selected service.
+| String
+| conditional
+| ``svc-trustbroker``
+
+| ``trustbroker.config.rest.services.<name>.authentication.password``
+| Password for ``BASIC`` authentication of the selected service.
+| String
+| conditional
+| ``secret``
+
+| ``trustbroker.config.rest.services.<name>.authentication.bearerToken``
+| Token for ``BEARER`` authentication of the selected service.
+| String
+| conditional
+| ``eyJ...``
+
+| ``trustbroker.config.rest.undefined``
+| Fallback value substituted when a referenced attribute is missing.
+| String
+| no (default ``UNDEF``)
+| ``UNKNOWN``
+
+| ``trustbroker.config.rest.services.<name>.network.backendConnectTimeoutSec``
+| HTTP connect timeout in seconds for the selected service.
+| Integer
+| no (default ``10``)
+| ``5``
+
+| ``trustbroker.config.rest.services.<name>.network.backendResponseTimeoutSec``
+| HTTP response timeout in seconds for the selected service.
+  Applies to the total time allowed to receive a complete response after the connection is established.
+| Integer
+| no (default ``30``)
+| ``15``
+
+|===
+
+=== IDMQuery parameters (ProfileRP XML)
+
+[cols="2,4,1,1,2"]
+|===
+| Parameter | Description | Type | Required | Example
+
+| ``store``
+| Must be set to ``REST`` to select this store.
+| String
+| yes
+| ``REST``
+
+| ``AppFilter``
+| Path suffix and/or query parameters appended to ``baseUrl`` at runtime. +
+  Supports ``${placeholder}`` expressions for dynamic values. +
+  See <<_appfilter_placeholder_reference>> for available placeholders.
+| String
+| no
+| ``/Users?filter=userName eq "${subjectNameId}"``
+
+| ``SubResource``
+| JSON Pointer (RFC 6901) to the array of resource objects in the response body. +
+  When absent the entire response is treated as a single resource.
+| String
+| no
+| ``/Resources``
+
+| ``UserDetailsSelection``
+| Attributes to extract from each resource object. +
+  Use ``storeMapper`` to provide a JSON Pointer if the attribute name differs from the JSON key.
+| XML Definition list
+| yes
+| ``userName``, ``emails``, ``groups``
+
+|===
+
+[[_appfilter_placeholder_reference]]
+== AppFilter placeholder reference
+
+Placeholders use the ``${name}`` syntax and are resolved at query time.
+When a referenced attribute is not available the configured ``undefined`` value (default: ``UNDEF``) is substituted.
+
+[cols="2,5,2"]
+|===
+| Placeholder | Resolved from | Example
+
+| ``${subjectNameId}``
+| NameID of the authenticated subject taken directly from the CP response.
+| ``${subjectNameId}``
+
+| ``${<attributeName>}``
+| Any attribute present in the CP response, referenced by its definition name.
+| ``${mail}``, ``${employeeNumber}``
+
+| ``${IDM:<queryName>:<attributeName>}``
+| Attribute returned by a *previous* IDM query in the same chain. +
+  Use ``REST`` as ``<queryName>`` to reference results from a prior REST query, +
+  or any other configured query name (e.g. ``LDAP``) for cross-store chaining.
+| ``${IDM:LDAP:uid}``, ``${IDM:REST:internalId}``
+
+| ``${PROPS:<propertyName>}``
+| A property from the current IDM result's property bag (``IdmResult.properties``). +
+  Matched by property name or namespace URI.
+| ``${PROPS:tenantId}``, ``${PROPS:http://example.org/tenant}``
+
+| ``${LIST:IDM:<queryName>:<attributeName>}``
+| Same as ``IDM:…`` but signals that the value is a list; the first element is used for substitution.
+| ``${LIST:IDM:LDAP:memberOf}``
+
+|===
+
+NOTE: Placeholders in ``baseUrl`` are *not* supported and will cause a runtime error.
+      Always put dynamic values in ``AppFilter``.
+
+NOTE: Maximum number of entries in ``trustbroker.config.rest.services`` is ``3``.
+
+NOTE: If ``trustbroker.config.rest.enabled=true`` is set, at least one
+      ``trustbroker.config.rest.services.<name>`` entry must be configured, otherwise startup fails.
+
+NOTE: When *no* ``AppFilter`` is set the selected service ``baseUrl`` is called as-is. This is useful when the endpoint
+      already returns exactly the resource(s) needed (e.g. a pre-filtered profile endpoint).
+
+== Examples
+
+=== Simple user lookup by NameID
+
+Fetch a SCIM user whose ``userName`` matches the authenticated subject's NameID.
+
+.application.yml
+[source,yaml]
+----
+trustbroker:
+  config:
+    rest:
+      enabled: true
+      stores:
+        SCIM:
+          baseUrl: https://scim.example.org/v2
+          network:
+            backendConnectTimeoutSec: 10
+            backendResponseTimeoutSec: 30
+          authentication:
+            method: BEARER
+            bearerToken: "${SCIM_TOKEN}"
+----
+
+.ProfileRP.xml
+[source,xml]
+----
+<IDMLookup>
+  <IDMQuery store="REST" name="SCIM">
+    <AppFilter>/Users?filter="${subjectNameId}"</AppFilter>
+    <SubResource>/Resources</SubResource>
+    <UserDetailsSelection>
+      <Definition name="mail"          storeMapper="/emails/0/value"/>
+      <Definition name="givenName"     storeMapper="/name/givenName"/>
+      <Definition name="familyName"    storeMapper="/name/familyName"/>
+    </UserDetailsSelection>
+  </IDMQuery>
+</IDMLookup>
+----
+
+The final URL called at runtime will be: +
+`https://scim.example.org/v2/Users?filter="alice@example.org"`
+
+---
+
+=== Path-parameter style lookup
+
+Append the user's employee number directly as a path segment.
+
+.ProfileRP.xml
+[source,xml]
+----
+<IDMLookup>
+  <IDMQuery store="REST" name="HR_USER">
+    <AppFilter>/employees/${employeeNumber}</AppFilter>
+    <UserDetailsSelection>
+      <Definition name="department" storeMapper="/department"/>
+      <Definition name="costCenter"  storeMapper="/costCenter"/>
+    </UserDetailsSelection>
+  </IDMQuery>
+</IDMLookup>
+----
+
+Resolves to: `https://scim.example.org/v2/employees/42831`
+
+---
+
+=== Chained query — use a value from a previous REST query
+
+First query resolves an internal ID; the second uses that ID to fetch group memberships.
+
+.ProfileRP.xml
+[source,xml]
+----
+<IDMLookup>
+  <!-- Step 1: resolve internal user ID -->
+  <IDMQuery store="REST" name="SCIM_USER">
+    <AppFilter>/Users?filter="${subjectNameId}"</AppFilter>
+    <SubResource>/Resources</SubResource>
+    <UserDetailsSelection>
+      <Definition name="internalId" storeMapper="/id"/>
+    </UserDetailsSelection>
+  </IDMQuery>
+
+  <!-- Step 2: fetch groups using the ID returned by step 1 -->
+  <IDMQuery store="REST" name="SCIM_GROUPS">
+    <AppFilter>/Groups?filter="${IDM:REST:internalId}"</AppFilter>
+    <SubResource>/Resources</SubResource>
+    <UserDetailsSelection>
+      <Definition name="groups" storeMapper="/displayName"/>
+    </UserDetailsSelection>
+  </IDMQuery>
+</IDMLookup>
+----
+
+After step 1 returns ``internalId=usr-99``, step 2 calls: +
+`https://scim.example.org/v2/Groups?filter=members eq "usr-99"`
+
+---
+
+=== Lookup using a properties claim (PROPS)
+
+When the IDM result carries a tenant identifier in its property bag, use ``PROPS`` to inject it.
+
+.ProfileRP.xml
+[source,xml]
+----
+<IDMLookup>
+  <IDMQuery store="REST" name="TENANT_ROLES">
+    <AppFilter>/tenants/${PROPS:tenantId}/roles/${subjectNameId}</AppFilter>
+    <SubResource>/roles</SubResource>
+    <UserDetailsSelection>
+      <Definition name="role" storeMapper="/name"/>
+    </UserDetailsSelection>
+  </IDMQuery>
+</IDMLookup>
+----
+
+If ``tenantId`` property is ``acme`` and the subject NameID is ``alice``, the URL becomes: +
+`https://scim.example.org/v2/tenants/acme/roles/alice`
+
+If ``tenantId`` is not present in the properties the ``undefined`` fallback (default ``UNDEF``) is used: +
+`https://scim.example.org/v2/tenants/UNDEF/roles/alice`
+
+---
+
+=== No AppFilter — call the selected service base URL as-is
+
+When ``AppFilter`` is omitted the selected service ``baseUrl`` is called directly.
+This suits endpoints that already scope results to the authenticated caller (e.g. via the bearer token).
+
+.ProfileRP.xml
+[source,xml]
+----
+<IDMLookup>
+  <IDMQuery store="REST" name="PROFILE">
+    <!-- no AppFilter: GET https://scim.example.org/v2/Me -->
+    <SubResource>/</SubResource>
+    <UserDetailsSelection>
+      <Definition name="mail"      storeMapper="/emails/0/value"/>
+      <Definition name="givenName" storeMapper="/name/givenName"/>
+    </UserDetailsSelection>
+  </IDMQuery>
+</IDMLookup>
+----
+
+The full URL called is simply: `https://scim.example.org/v2/Me`

@@ -179,6 +179,8 @@ public class AuditDto {
 
 	private String conversationId; // conversation based traceId handled by XTB
 
+	private String rpTxnId; // Relying party transaction ID provided by RP (if any)
+
 	private String sessId; // SSO/SLO future use
 
 	private String ssoSessionId; // external session mapped to http://trustbroker.swiss/claims/ssoSessionId

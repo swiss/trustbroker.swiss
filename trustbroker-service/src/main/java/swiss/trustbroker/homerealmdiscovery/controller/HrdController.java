@@ -194,22 +194,37 @@ public class HrdController {
 		var authReqId = deviceInfoReq.getId();
 		var cpIssuerId = ApiSupport.decodeUrlParameter(deviceInfoReq.getCpUrn());
 		var rpIssuerId = ApiSupport.decodeUrlParameter(deviceInfoReq.getRpUrn());
-		var referer = WebUtil.getHeader(org.springframework.http.HttpHeaders.REFERER, request);
-		var deviceID = WebSupport.getDeviceId(request);
-
-		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(cpIssuerId, referer);
-		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(rpIssuerId, referer);
+		var deviceId = WebSupport.getDeviceId(request);
 
 		// SSO bailout based on previous CP auth
 		var stateDataByAuthnReq = findValidStateByAuthnRequestId(authReqId);
-		var stateByCookieId = ssoService.findValidStateFromCookies(relyingParty, claimsParty, request.getCookies());
+		var sessionCpIssuer = stateDataByAuthnReq.getCpIssuer();
+		var sessionRpIssuer = stateDataByAuthnReq.getRpIssuer();
+		if (sessionCpIssuer == null || sessionRpIssuer == null) {
+			throw new TechnicalException(String.format("DeviceInfo stateData=%s not ready - "
+							+ "missing sessionCpIssuer=%s or sessionRpIssuer=%s request supplied rpIssuerId=%s cpIssuerId=%s",
+					stateDataByAuthnReq.getId(), sessionCpIssuer, sessionRpIssuer, rpIssuerId, cpIssuerId));
+		}
+		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(sessionCpIssuer, null);
+		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(sessionRpIssuer, null);
+		// Removing redundant parameters - check for violations of the expectation and address them before dropping the code:
+		if (!claimsParty.getId().equals(cpIssuerId)) {
+			throw new TechnicalException(String.format("DeviceInfo.cpUrn=%s not matching stateData=%s cpIssuer=%s",
+					cpIssuerId, stateDataByAuthnReq.getId(), claimsParty.getId()));
+		}
+		if (!relyingParty.getId().equals(rpIssuerId)) {
+			throw new TechnicalException(String.format("DeviceInfo.rpUrn=%s not matching stateData=%s rpIssuer=%s",
+					rpIssuerId, stateDataByAuthnReq.getId(), relyingParty.getId()));
+		}
+		var stateByCookieId = ssoService.findValidStateFromCookies(relyingParty, claimsParty,
+				stateDataByAuthnReq, request.getCookies());
 		if (stateByCookieId.isPresent()) {
 			log.debug("Session state found based on cookie, checking SSO...");
 			var ssoStateData = stateByCookieId.get();
 			// SSO established
 			// AuthnRequest attributes like QOA etc. have been checked earlier in AssertionConsumerService
 			if (ssoService.ssoStateValidForDeviceInfo(claimsParty, relyingParty, ssoStateData,
-					stateDataByAuthnReq, deviceID, cpIssuerId)) {
+					stateDataByAuthnReq, deviceId, claimsParty.getId())) {
 				return sendResponseForSso(request, response, relyingParty, claimsParty, ssoStateData, stateDataByAuthnReq);
 			}
 		}

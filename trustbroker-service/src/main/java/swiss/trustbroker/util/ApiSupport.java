@@ -16,6 +16,7 @@
 package swiss.trustbroker.util;
 
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -156,6 +157,10 @@ public class ApiSupport {
 
 	public static final String MONITORING_ACS_URL = API_CONTEXT + MONITORING_ACS_API;
 
+	public static final String MONITORING_HEALTH_API = "/monitoring/health";
+
+	public static final String MONITORING_HEALTH_URL = API_CONTEXT + MONITORING_HEALTH_API;
+
 	public static final String CONFIG_STATUS_API = API_CONTEXT + "/config/status";
 
 	public static final String CONFIG_SCHEMAS_API = API_CONTEXT + "/config/schemas";
@@ -266,6 +271,25 @@ public class ApiSupport {
 
 	public ApiSupport(TrustBrokerProperties trustBrokerProperties) {
 		this.trustBrokerProperties = trustBrokerProperties;
+	}
+
+	// valid SAML AuthnRequest entry points
+	public static Set<String> getSamlEntryPoints(String perimeterUrl) {
+		var normalizedPerimeterUrl = StringUtils.stripEnd(perimeterUrl, "/");
+		return Set.of(
+				normalizedPerimeterUrl + SAML_API,
+				normalizedPerimeterUrl + ADFS_ENTRY_URL,
+				normalizedPerimeterUrl + ADFS_ENTRY_URL_TRAILING_SLASH,
+				normalizedPerimeterUrl + XTB_LEGACY_ENTRY_URL
+		);
+	}
+
+	// valid WS-Fed entry points
+	public static Set<String> getWsFedEntryPoints(String perimeterUrl) {
+		var normalizedPerimeterUrl = StringUtils.stripEnd(perimeterUrl, "/");
+		return Set.of(
+				normalizedPerimeterUrl + WSFED_API
+		);
 	}
 
 	// API is in theory stateless but serves resources but addresses profiles and announcements of a running federation

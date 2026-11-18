@@ -20,6 +20,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
@@ -29,12 +30,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
@@ -50,6 +52,7 @@ import swiss.trustbroker.api.sessioncache.dto.AttributeName;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.CoreAttributeName;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.xmlconfig.AttributesSelection;
 import swiss.trustbroker.federation.xmlconfig.ClaimsMapper;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
@@ -79,6 +82,9 @@ class ClaimsMapperServiceTest {
 	@MockitoBean
 	private RelyingPartySetupService relyingPartySetupService;
 
+	@MockitoBean
+	private RelyingPartyDefinitions relyingPartyDefinitions;
+
 	@Autowired
 	private ClaimsMapperService claimsMapperService;
 
@@ -106,8 +112,8 @@ class ClaimsMapperServiceTest {
 		Definition definition1 = new Definition("attr1");
 		Definition definition2 = new Definition("attr2");
 
-		List<String> values1 = Arrays.asList("value1", "value2");
-		List<String> values2 = Arrays.asList("value3", "value4");
+		List<String> values1 = List.of("value1", "value2");
+		List<String> values2 = List.of("value3", "value4");
 
 		attributes.put(definition1, values1);
 		attributes.put(definition2, values2);
@@ -127,8 +133,8 @@ class ClaimsMapperServiceTest {
 		Definition definition1 = new Definition("attr1");
 		Definition definition2 = new Definition("attr2");
 
-		List<String> values1 = Arrays.asList("value1", "value2");
-		List<String> values2 = Arrays.asList("value3", "value4");
+		List<String> values1 = List.of("value1", "value2");
+		List<String> values2 = List.of("value3", "value4");
 
 		attributes.put(definition1, values1);
 		attributes.put(definition2, values2);
@@ -445,6 +451,37 @@ class ClaimsMapperServiceTest {
 				assertThat(cpResponse.getProperty(claim, source), is(expectedFirst));
 				break;
 		}
+	}
+
+	@Test
+	void applyFinalAttributeMappingWithOidcScopesAndNullClaimsSelection() {
+		var relyingParty = RelyingParty.builder()
+				.id("testRp")
+				.build();
+		var params = ResponseParameters.builder()
+				.rpIssuerId(relyingParty.getId())
+				.build();
+		var cpResponse = CpResponse.builder()
+				.issuer("testCp")
+				.attributes(new HashMap<>())
+				.userDetails(new HashMap<>())
+				.properties(new HashMap<>())
+				.oidcClientId("client-1")
+				.oidcScopes(Set.of("openid", "profile"))
+				.build();
+
+		doReturn(relyingParty)
+				.when(relyingPartySetupService)
+				.getRelyingPartyByIssuerIdOrReferrer(params.getRpIssuerId(), params.getRpReferer());
+		doReturn(Optional.empty())
+				.when(relyingPartyDefinitions)
+				.getOidcClientConfigById("client-1", trustBrokerProperties);
+
+		claimsMapperService.applyFinalAttributeMapping(cpResponse, params, "dest", relyingParty);
+
+		assertThat(cpResponse.getOidcClientId(), is("client-1"));
+		assertThat(cpResponse.getOidcScopes(), is(Set.of("openid", "profile")));
+		assertNull(relyingParty.getClaimsSelection());
 	}
 
 	private static CpResponse givenCpResponse() {

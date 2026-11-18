@@ -68,6 +68,7 @@ class IdmQueryTest {
 		doReturn(idmQuery.getClientExtId()).when(idmRequest).getClientExtId();
 		doReturn(idmQuery.getAppFilter()).when(idmRequest).getAppFilter();
 		doReturn(idmQuery.getUserStatusPolicy()).when(idmRequest).getUserStatusPolicy();
+		doReturn(idmQuery.getQueryControl()).when(idmRequest).getQueryControl();
 		doReturn(idmQuery.getAttributeSelection()).when(idmRequest).getAttributeSelection();
 
 		var copy = IdmQuery.of(idmRequest);
@@ -88,6 +89,12 @@ class IdmQueryTest {
 		query.setStatusPolicy(StatusPolicy.BLOCK);
 		assertThat(query.isFetchActiveOnly(), is(false));
 		assertThat(query.statusPolicyWithDefault(), is(StatusPolicy.BLOCK));
+		assertThat(query.queryControlWithDefault(), is(QueryControl.PRIMARY));
+		assertThat(query.getQueryControl(), is(QueryControl.PRIMARY.name()));
+
+		query.setQueryControl(QueryControl.ADDITIONAL);
+		assertThat(query.queryControlWithDefault(), is(QueryControl.ADDITIONAL));
+		assertThat(query.getQueryControl(), is(QueryControl.ADDITIONAL.name()));
 	}
 
 	@Test

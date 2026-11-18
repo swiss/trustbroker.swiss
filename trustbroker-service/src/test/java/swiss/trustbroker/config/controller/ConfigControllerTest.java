@@ -33,7 +33,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.config.dto.CookieProperties;
+import swiss.trustbroker.config.dto.GuiProperties;
 import swiss.trustbroker.util.ApiSupport;
+
 @ExtendWith(SpringExtension.class)
 @WebMvcTest
 @ContextConfiguration(classes = {
@@ -62,6 +65,35 @@ class ConfigControllerTest {
 				{version:"1.0.1"}
 				""";
 		this.mockMvc.perform(get(ApiSupport.VERSION_API))
+					.andExpect(status().isOk())
+					.andExpect(content().json(resultJson));
+	}
+
+	@Test
+	void guiConfigApi() throws Exception {
+		var languageCookie = CookieProperties.builder().name("lang").path("/").domain("example.com").build();
+		var themeCookie = CookieProperties.builder().name("theme").path("/").build();
+		var announcementCookie = CookieProperties.builder().name("announcement").build();
+		var noticeCookie = CookieProperties.builder().name("notice").build();
+		var guiProps = GuiProperties.builder()
+				.languageCookie(languageCookie)
+				.themeCookie(themeCookie)
+				.announcementCookie(announcementCookie)
+				.claimsProviderNoticeCookie(noticeCookie)
+				.build();
+		doReturn(guiProps).when(trustBrokerProperties).getGui();
+
+		var resultJson = """
+				{
+					"languageCookie":             {"name":"lang","path":"/","domain":"example.com"},
+					"themeCookie":                {"name":"theme","path":"/"},
+					"announcementCookie":          {"name":"announcement"},
+					"claimsProviderNoticeCookie":  {"name":"notice"},
+					"buttons":                    [],
+					"features":                   []
+				}
+				""";
+		this.mockMvc.perform(get(ApiSupport.CONFIG_FRONTEND_API))
 					.andExpect(status().isOk())
 					.andExpect(content().json(resultJson));
 	}

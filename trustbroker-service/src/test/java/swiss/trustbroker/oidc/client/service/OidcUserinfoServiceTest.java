@@ -37,6 +37,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.util.OidcUtil;
+import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.federation.xmlconfig.Certificates;
 import swiss.trustbroker.federation.xmlconfig.OidcClaimsSource;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
@@ -51,13 +53,16 @@ class OidcUserinfoServiceTest {
 	private HttpClient httpClient;
 
 	@MockitoBean
-	private HttpResponse httpResponseUserinfo;
+	private HttpResponse<?> httpResponseUserinfo;
 
 	@MockitoBean
 	private OidcHttpClientProvider httpClientProvider;
 
 	@Autowired
 	private OidcUserinfoService oidcUserinfoService;
+
+	@MockitoBean
+	private TrustBrokerProperties trustBrokerProperties;
 
 	@ParameterizedTest
 	@MethodSource
@@ -66,6 +71,7 @@ class OidcUserinfoServiceTest {
 		var client = OidcMockTestData.givenClient(claimsSources);
 		var certificates = Certificates.builder().build();
 		var configuration = OidcMockTestData.givenConfiguration();
+		doReturn(new SecurityChecks()).when(trustBrokerProperties).getSecurity();
 		mockUserinfoResponse(client, certificates, configuration, responseString, contentType);
 
 		if (expectedException == null) {

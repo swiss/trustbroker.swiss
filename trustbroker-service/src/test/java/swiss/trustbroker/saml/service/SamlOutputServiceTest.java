@@ -18,10 +18,17 @@ package swiss.trustbroker.saml.service;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.velocity.app.VelocityEngine;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +37,7 @@ import org.opensaml.saml.common.binding.artifact.SAMLArtifactMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -37,10 +45,13 @@ import swiss.trustbroker.api.saml.dto.DestinationType;
 import swiss.trustbroker.api.saml.dto.EncodingParameters;
 import swiss.trustbroker.common.saml.service.ArtifactCacheService;
 import swiss.trustbroker.common.saml.util.SamlIoUtil;
+import swiss.trustbroker.common.saml.util.VelocityUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.ArtifactResolution;
 import swiss.trustbroker.config.dto.SamlProperties;
+import swiss.trustbroker.federation.xmlconfig.SloResponse;
 import swiss.trustbroker.saml.test.util.ServiceSamlTestUtil;
+import swiss.trustbroker.sso.dto.SloNotification;
 import swiss.trustbroker.test.saml.util.SamlHttpTestBase;
 import swiss.trustbroker.test.saml.util.SamlTestBase;
 
@@ -58,6 +69,13 @@ class SamlOutputServiceTest extends ServiceSamlTestUtil {
 	private static final String ENDPOINT = "https://localhost/service";
 
 	private static final String ENDPOINT_HTML_ENCODED = "https&#x3a;&#x2f;&#x2f;localhost&#x2f;service";
+
+	private static final String LOGOUT_URL = "https://localhost/logmeout";
+
+	private static final String LOGOUT_URL_HTML_ENCODED = "https&#x3a;&#x2f;&#x2f;localhost&#x2f;logmeout";
+
+	private static final String LOGOUT_URL_DOUBLE_HTML_ENCODED =
+			"https&amp;&#x23;x3a&#x3b;&amp;&#x23;x2f&#x3b;&amp;&#x23;x2f&#x3b;localhost&amp;&#x23;x2f&#x3b;logmeout";
 
 	private static final DestinationType DESTINATION_ALIAS = DestinationType.RP;
 
@@ -161,6 +179,59 @@ class SamlOutputServiceTest extends ServiceSamlTestUtil {
 	}
 
 	@Test
+	void sendLogoutResponseAsPost() throws Exception {
+		var response = loadLogoutResponse();
+		var httpResponse = new MockHttpServletResponse();
+		Map<String, Object> params = new HashMap<>();
+		var additionalFields = addAdditionalFields(params);
+		var sloParameters = addSloParameters(params);
+		var encodingParams = EncodingParameters.builder().templateParameters(params).build();
+
+		samlOutputService.sendResponse(response, null, RELAY_STATE, ENDPOINT, httpResponse, encodingParams, DESTINATION_ALIAS);
+
+		// rendered as template
+		var content = validateResponse(httpResponse);
+		assertThat(content, not(containsString("$"))); // all parameters covered
+		for (var additionalField : additionalFields) {
+			var value = SamlHttpTestBase.extractHtmlFormValue(content, additionalField.getKey());
+			assertThat(value, is(additionalField.getValue()));
+		}
+		for (var sloParameter : sloParameters) {
+			assertThat(content, containsString(sloParameter.getKey()));
+			assertThat(content, containsString(sloParameter.getValue()));
+		}
+		assertThat(content, containsString(":" + LOGOUT_URL_HTML_ENCODED + "\\"));
+		assertThat(content, containsString("action=&quot;" + LOGOUT_URL_DOUBLE_HTML_ENCODED + "&quot;"));
+	}
+
+	private static List<Pair<String, String>> addAdditionalFields(Map<String, Object> params) {
+		List<Pair<String, String>> additionalFields = new ArrayList<>();
+		additionalFields.add(Pair.of("foo", "bar"));
+		additionalFields.add(Pair.of("customKey", "&#x22;custom&#x22;&#x20;value"));
+		params.put(VelocityUtil.VELOCITY_PARAM_ADDITIONAL_FIELDS, additionalFields);
+		return additionalFields;
+	}
+
+	private static List<Pair<String, String>> addSloParameters(Map<String, Object> params) {
+		var notification = new SloNotification(SloResponse.builder().url(LOGOUT_URL).build());
+		List<Pair<String, String>> queryParams = List.of(
+				Pair.of("qParam", "qValue"),
+				Pair.of("encoded:param", "\"quoted\""));
+		notification.setQueryParameters(queryParams);
+		notification.setUrl(LOGOUT_URL);
+		notification.setSamlHttpMethod(HttpMethod.POST.name());
+		// see SsoService:
+		params.put("XTBSloNotifications", List.of(notification));
+		params.put("XTBSloWaitForCount", 5);
+		params.put("XTBSloMaxWaitMillis", 100);
+		params.put("XTBSloSerializeNotifications", false);
+		return List.of(
+				Pair.of("name=&quot;qParam&quot;", "value=&quot;qValue&quot;"),
+				Pair.of("name=&quot;encoded&amp;&#x23;x3a&#x3b;param&quot;",
+						"value=&quot;&amp;quot&#x3b;quoted&amp;quot&#x3b;&quot;"));
+	}
+
+	@Test
 	void sendLogoutResponseAsRedirect() throws Exception {
 		var response = loadLogoutResponse();
 		var httpResponse = new MockHttpServletResponse();
@@ -194,14 +265,14 @@ class SamlOutputServiceTest extends ServiceSamlTestUtil {
 		assertThat(location, containsString('&' + SamlIoUtil.SAML_REDIRECT_SIGNATURE_ALGORITHM + '='));
 	}
 
-
-	private static void validateResponse(MockHttpServletResponse httpResponse) throws Exception {
+	private static String validateResponse(MockHttpServletResponse httpResponse) throws Exception {
 		assertThat(httpResponse.getStatus(), is(HttpStatus.OK.value()));
 		var content = httpResponse.getContentAsString();
 		assertThat(content, containsString(" action=\"" + ENDPOINT_HTML_ENCODED + '"'));
 		assertThat(content, containsString(" value=\"" + RELAY_STATE_HTML_ENCODED + '"'));
-		var encodedRelayState = SamlHttpTestBase.extractHtmlFormValue( content, SamlIoUtil.SAML_RELAY_STATE);
+		var encodedRelayState = SamlHttpTestBase.extractHtmlFormValue(content, SamlIoUtil.SAML_RELAY_STATE);
 		assertThat(encodedRelayState, is(RELAY_STATE_HTML_ENCODED));
+		return content;
 	}
 
 }

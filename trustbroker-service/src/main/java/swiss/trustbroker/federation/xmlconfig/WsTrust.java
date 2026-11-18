@@ -23,7 +23,6 @@ import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
-import jakarta.xml.bind.annotation.XmlTransient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -46,6 +45,7 @@ public class WsTrust implements Serializable {
 	 * <br/>
 	 * Default: true
 	 */
+	@Default("true")
 	@XmlAttribute(name = "enabled")
 	private Boolean enabled;
 
@@ -55,6 +55,7 @@ public class WsTrust implements Serializable {
 	 * <br/>
 	 * Default: false
 	 */
+	@Default("false")
 	@XmlAttribute(name = "counterPartyDefault")
 	private Boolean counterPartyDefault;
 
@@ -67,14 +68,4 @@ public class WsTrust implements Serializable {
 	 */
 	@XmlElement(name = "SupportedBinding")
 	private List<WsTrustBinding> supportedBindings;
-
-	@XmlTransient
-	public boolean isEnabled() {
-		return enabled == null || enabled;
-	}
-
-	@XmlTransient
-	public boolean isCounterPartyDefault() {
-		return Boolean.TRUE.equals(counterPartyDefault);
-	}
 }

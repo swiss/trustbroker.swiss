@@ -44,8 +44,6 @@ import swiss.trustbroker.sso.service.SsoService;
 @Slf4j
 public class CustomLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler {
 
-	private final ClientConfigInMemoryRepository registeredClientRepository;
-
 	private final TrustBrokerProperties properties;
 
 	private final RelyingPartyDefinitions relyingPartyDefinitions;
@@ -79,7 +77,7 @@ public class CustomLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler {
 		var redirectUrl = originalRedirectUrl;
 		if (redirectUrl != null &&
 				!OidcConfigurationUtil.isRedirectUrlValid(redirectUrl, clientId, OidcUtil.LOGOUT_REDIRECT_URI,
-						relyingPartyDefinitions, registeredClientRepository)) {
+						relyingPartyDefinitions, properties)) {
 			log.debug("Sending HTTP FORBIDDEN for OIDC clientId={} ssoSessionId={} due to invalid redirectUrl={}",
 					clientId, ssoSessionId, redirectUrl);
 			response.setStatus(HttpStatus.SC_FORBIDDEN);
@@ -105,7 +103,7 @@ public class CustomLogoutSuccessHandler extends SimpleUrlLogoutSuccessHandler {
 	}
 
 	// must be called with redirectUrl validated with OidcConfigurationUtil.isRedirectUrlValid
-	private void renderResponse(String clientId, String redirectUrl, String ssoSessionId, String oidcSessionId,
+	void renderResponse(String clientId, String redirectUrl, String ssoSessionId, String oidcSessionId,
 			HttpServletRequest request, HttpServletResponse response) throws IOException {
 		var realmName = OidcUtil.getRealmFromRequestUrl(request.getRequestURI());
 		var relyingParty = relyingPartyDefinitions.getRelyingPartyByOidcClientId(clientId, realmName, properties, false);

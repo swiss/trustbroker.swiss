@@ -10,7 +10,7 @@
     </envs>
     <module name="trustbroker-swiss.trustbroker-application.main" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="swiss.trustbroker.Application" />
-    <option name="VM_PARAMETERS" value="-Dtrustbroker.config.versionInfo=Intellij -Dtrustbroker.config.frontendBaseUrl=http://localhost:4200 -Dtrustbroker.config.ldap.enabled=true -Dtrustbroker.config.rest.enabled=true" />
+    <option name="VM_PARAMETERS" value="-Dtrustbroker.config.versionInfo=Intellij -Dtrustbroker.config.frontendBaseUrl=http://localhost:4200 -Dtrustbroker.config.ldap.enabled=true -Dtrustbroker.config.rest.enabled=false -Dspring.flyway.url=&quot;jdbc:h2:mem:TBSS16;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS TBSS16&quot; -Dspring.flyway.user=sa -Dspring.flyway.schemas=TBSS16 -Dspring.flyway.driver-class-name=org.h2.Driver -Dspring.flyway.locations=classpath:db/migration/h2 -Dspring.datasource.url=&quot;jdbc:h2:mem:TBSS16;DB_CLOSE_DELAY=-1;INIT=SET SCHEMA TBSS16&quot; -Dspring.datasource.username=sa" />
     <option name="WORKING_DIRECTORY" value="file://$PROJECT_DIR$/trustbroker-application" />
     <method v="2">
       <option name="Make" enabled="true" />

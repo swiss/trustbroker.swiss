@@ -98,7 +98,7 @@ public class CustomUserInfoResponseHandler implements AuthenticationSuccessHandl
 		}
 	}
 
-	private void encryptUserInfoResponse(HttpServletResponse response, Map<String, Object> claims, OidcEncryptionKeystoreService.EncryptionParams encryptionParams, String clientId) {
+	void encryptUserInfoResponse(HttpServletResponse response, Map<String, Object> claims, OidcEncryptionKeystoreService.EncryptionParams encryptionParams, String clientId) {
 		var claimsSetBuilder = new JWTClaimsSet.Builder();
 		claims.forEach(claimsSetBuilder::claim);
 		var claimsSet = claimsSetBuilder.build();
@@ -128,7 +128,7 @@ public class CustomUserInfoResponseHandler implements AuthenticationSuccessHandl
 		}
 	}
 
-	private String extractClientIdFromClaims(OidcUserInfoAuthenticationToken userInfoAuthenticationToken) {
+	String extractClientIdFromClaims(OidcUserInfoAuthenticationToken userInfoAuthenticationToken) {
 		Object aud = null;
 		if (userInfoAuthenticationToken.getPrincipal() instanceof JwtAuthenticationToken jwt) {
 			aud = jwt.getTokenAttributes().get(OidcUtil.OIDC_AUDIENCE);

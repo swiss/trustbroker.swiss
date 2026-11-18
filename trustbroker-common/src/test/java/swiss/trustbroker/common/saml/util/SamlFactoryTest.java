@@ -59,7 +59,7 @@ class SamlFactoryTest extends SamlTestBase {
 
 	@BeforeAll
 	@SuppressWarnings("java:S5786")
-	public static void setup() {
+	static void setUp() {
 		SamlTestBase.setup();
 	}
 

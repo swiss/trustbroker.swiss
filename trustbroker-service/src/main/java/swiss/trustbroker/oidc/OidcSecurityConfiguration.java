@@ -74,8 +74,6 @@ import swiss.trustbroker.util.ApiSupport;
 @Slf4j
 public class OidcSecurityConfiguration {
 
-	private final ClientConfigInMemoryRepository registeredClientRepository;
-
 	private final CustomRelyingPartyRegistrationRepository relyingPartyRegistrationRepository;
 
 	private final TrustBrokerProperties properties;
@@ -190,7 +188,7 @@ public class OidcSecurityConfiguration {
 
 	@Bean
 	public LogoutSuccessHandler logoutSuccessHandler() {
-		return new CustomLogoutSuccessHandler(registeredClientRepository, properties, relyingPartyDefinitions,
+		return new CustomLogoutSuccessHandler(properties, relyingPartyDefinitions,
 				customOAuth2AuthorizationService, ssoService, velocityEngine);
 	}
 

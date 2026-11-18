@@ -20,6 +20,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -31,7 +32,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import swiss.trustbroker.common.dto.AcceptedUrl;
 import swiss.trustbroker.config.dto.CorsPolicies;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 
 class CorsSupportTest {
 
@@ -108,7 +111,7 @@ class CorsSupportTest {
 
 	@ParameterizedTest
 	@MethodSource
-	void testGetAllowedOrigin(Set<String> allowedOrigins, String origin, String referer, String expected) {
+	void testGetAllowedOrigin(Collection<AcceptedUrl> allowedOrigins, String origin, String referer, String expected) {
 		var request = new MockHttpServletRequest();
 		if (origin != null) {
 			request.addHeader(HttpHeaders.ORIGIN, origin);
@@ -124,13 +127,13 @@ class CorsSupportTest {
 		return new Object[][] {
 				{ null, null, null, null },
 				{ Collections.emptySet(), URL, null, null },
-				{ Set.of("*"), URL, null, URL },
-				{ Set.of("http://localhost:8080", "*"), URL, null, URL },
-				{ Set.of(URL), URL, null, URL },
-				{ Set.of(URL + "/"), URL, null, URL },
-				{ Set.of(URL), null, URL + "/", URL },
-				{ Set.of(URL + "/"), null, URL + "/", URL }, // allowed match by referrer
-				{ Set.of("https://localhost", URL, "http://localhost:8443/logout"), URL, null, URL }
+				{ Set.of(AcUrl.of("*")), URL, null, URL },
+				{ Set.of(AcUrl.of("http://localhost:8080"), AcUrl.of("*")), URL, null, URL },
+				{ Set.of(AcUrl.of(URL)), URL, null, URL },
+				{ Set.of(AcUrl.of(URL + "/")), URL, null, URL },
+				{ Set.of(AcUrl.of(URL)), null, URL + "/", URL },
+				{ Set.of(AcUrl.of(URL + "/")), null, URL + "/", URL }, // allowed match by referrer
+				{ Set.of(AcUrl.of("https://localhost"), AcUrl.of(URL), AcUrl.of("http://localhost:8443/logout")), URL, null, URL }
 		};
 	}
 

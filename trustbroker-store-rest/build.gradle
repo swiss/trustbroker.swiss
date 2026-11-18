@@ -1,0 +1,23 @@
+plugins {
+	id 'java-library'
+	id 'jacoco'
+}
+
+dependencies {
+	// components
+	implementation project("${rootProject.top}:trustbroker-api")
+	implementation project("${rootProject.top}:trustbroker-common")
+	implementation project("${rootProject.top}:trustbroker-service")
+	testImplementation project("${rootProject.top}:trustbroker-test")
+
+	// spring-boot baseline
+	implementation "org.springframework.boot:spring-boot-starter-web"
+	implementation "org.springframework:spring-webflux"
+
+	// monitoring
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
+	// spring-test baseline
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+

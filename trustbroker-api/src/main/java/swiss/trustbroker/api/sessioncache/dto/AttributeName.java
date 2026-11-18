@@ -70,6 +70,14 @@ public interface AttributeName {
 		return null;
 	}
 
+	/**
+	 * @return JSON path expression for REST response mapping.
+	 * @since 1.16.0
+	 */
+	default String getStoreMapper() {
+		return null;
+	}
+
 	// default name comparison:
 
 	/**

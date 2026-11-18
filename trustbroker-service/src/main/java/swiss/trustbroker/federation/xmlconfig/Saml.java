@@ -23,7 +23,6 @@ import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
-import jakarta.xml.bind.annotation.XmlTransient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -44,11 +43,12 @@ public class Saml implements Serializable {
 	/**
 	 * SAML protocol enabled.
 	 * <br/>
-	 * Default: true (for backwards compatibility)
+	 * Default: true
 	 * <br/>
 	 * Note: At the moment, SAML needs to be enabled for OIDC as well due to the internal SAML hop done for OIDC.
 	 * @since 1.14.0
 	 */
+	@Default("true")
 	@XmlAttribute(name = "enabled")
 	private Boolean enabled;
 
@@ -58,6 +58,7 @@ public class Saml implements Serializable {
 	 * Default: true
 	 * @since 1.12.0
 	 */
+	@Default("true")
 	@XmlAttribute(name="forwardRpProtocolBinding")
 	private Boolean forwardRpProtocolBinding;
 
@@ -124,13 +125,8 @@ public class Saml implements Serializable {
 		return protocolEndpoints;
 	}
 
-	@XmlTransient
-	public boolean isEnabled() {
+	// used during configuration, where @Default is not yet set
+	public boolean enabled() {
 		return enabled == null || enabled;
-	}
-
-	@XmlTransient
-	public boolean isForwardRpProtocolBinding() {
-		return forwardRpProtocolBinding == null || forwardRpProtocolBinding;
 	}
 }

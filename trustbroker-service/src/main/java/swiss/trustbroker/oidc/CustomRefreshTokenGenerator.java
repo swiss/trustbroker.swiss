@@ -128,7 +128,7 @@ public final class CustomRefreshTokenGenerator implements OAuth2TokenGenerator<O
 		return false;
 	}
 
-	private static JwtClaimsSet buildClaims(OAuth2TokenContext context,
+	static JwtClaimsSet buildClaims(OAuth2TokenContext context,
 			Instant issuedAt, Instant expiresAt, String sessionId, String nonce) {
 		var claimsBuilder = JwtClaimsSet.builder();
 		String issuer = null;
@@ -162,7 +162,7 @@ public final class CustomRefreshTokenGenerator implements OAuth2TokenGenerator<O
 		return claimsBuilder.build();
 	}
 
-	private Instant computeRefreshTokenExpiration(OAuth2TokenContext context, Instant issuedAt) {
+	Instant computeRefreshTokenExpiration(OAuth2TokenContext context, Instant issuedAt) {
 		var expiresAt = issuedAt;
 		var source = "now";
 		var client = context.getRegisteredClient();

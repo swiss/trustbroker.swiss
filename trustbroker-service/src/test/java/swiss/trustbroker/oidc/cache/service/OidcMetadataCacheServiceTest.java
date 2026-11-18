@@ -115,8 +115,7 @@ class OidcMetadataCacheServiceTest {
 		mockMetadata(cp, oidcClient, metadataJson);
 		var cps = givenClaimsParties(cp);
 		doReturn(cps).when(relyingPartyDefinitions).getClaimsProviderSetup();
-		doReturn(new OidcProperties()).when(trustBrokerProperties).getOidc();
-
+		mockOidcProperties();
 		var rps = givenRelyingParties();
 		doReturn(rps).when(relyingPartyDefinitions).getRelyingPartySetup();
 
@@ -164,8 +163,7 @@ class OidcMetadataCacheServiceTest {
 		var oidcClient = OidcMockTestData.givenClient();
 		var cp = OidcMockTestData.givenCpWithOidcClient(oidcClient);
 		mockMetadata(cp, oidcClient, OidcMockTestData.METADATA_JSON);
-		var oidcProperties = new OidcProperties();
-		doReturn(oidcProperties).when(trustBrokerProperties).getOidc();
+		var oidcProperties = mockOidcProperties();
 
 		var jwk = service.getKey(cp, OidcMockTestData.KEY_ID, null);
 
@@ -316,5 +314,12 @@ class OidcMetadataCacheServiceTest {
 	private RelyingPartySetup givenRelyingParties() {
 		List<RelyingParty> rps = List.of(RelyingParty.builder().id("ignored").build());
 		return RelyingPartySetup.builder().relyingParties(rps).build();
+	}
+
+	private OidcProperties mockOidcProperties() {
+		var oidcProperties = new OidcProperties();
+		oidcProperties.setEnabled(true);
+		doReturn(oidcProperties).when(trustBrokerProperties).getOidc();
+		return oidcProperties;
 	}
 }

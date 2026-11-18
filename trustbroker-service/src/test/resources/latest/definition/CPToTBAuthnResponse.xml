@@ -1,6 +1,6 @@
 <saml2p:Response xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol"
 				 xmlns:xs="http://www.w3.org/2001/XMLSchema"
-				 Destination="https://test.trustbroker.swiss/api/v1/saml"
+				 Destination="http://localhost:8080/api/v1/saml"
 				 ID="Response_d56c04bab3466e5262243c99d4a260d5772e0e2d"
 				 InResponseTo="id-e666ae1d-9d4b-439a-bd0f-c6663885a0c3"
 				 IssueInstant="2020-11-04T10:17:27.284Z"

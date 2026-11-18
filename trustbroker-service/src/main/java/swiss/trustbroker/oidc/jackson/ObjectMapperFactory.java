@@ -28,14 +28,32 @@ public class ObjectMapperFactory {
 	// Internal use only when we read object trees from token database
 	public static JsonMapper springSecObjectMapper() {
 		var validatorBuilder = BasicPolymorphicTypeValidator.builder()
-		                                                    .allowIfSubType("java.lang")
-		                                                    .allowIfSubType("java.util");
+				.allowIfSubType(Long.class)
+				// Allow collection subtypes to handle immutable ones from List.of/Map.of/Collections.unmodifiableX.
+				// This is an internal JDK class. There is a unit test in case that will fail if this ever changes.
+				.allowIfSubType("java.util.ImmutableCollections$")
+				.allowIfSubType("java.util.Collections$Unmodifiable");
 		var classLoader = ObjectMapperFactory.class.getClassLoader();
 		var securityModules = SecurityJacksonModules.getModules(classLoader, validatorBuilder);
 		var typeValidator = validatorBuilder.build();
 		return JsonMapper.builder()
 		                 .polymorphicTypeValidator(typeValidator)
 		                 .addModules(securityModules)
+		                 .build();
+	}
+
+	// Use for plain JSON Map/List claims.
+	// Not springSecObjectMapper(): Spring Security modules are for security object graphs and can fail on simple payloads.
+	public static JsonMapper securedObjectMapper() {
+		var typeValidator = BasicPolymorphicTypeValidator.builder()
+		                                                 .allowIfSubType(Long.class)
+		                                                 // Allow collection subtypes to handle immutable ones from List.of/Map.of/Collections.unmodifiableX.
+		                                                 // These are JDK-internal names and are protected by unit tests.
+		                                                 .allowIfSubType("java.util.ImmutableCollections$")
+		                                                 .allowIfSubType("java.util.Collections$Unmodifiable")
+		                                                 .build();
+		return JsonMapper.builder()
+		                 .polymorphicTypeValidator(typeValidator)
 		                 .build();
 	}
 

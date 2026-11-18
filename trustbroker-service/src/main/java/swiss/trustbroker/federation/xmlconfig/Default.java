@@ -23,10 +23,14 @@ import java.lang.annotation.Target;
 /**
  * Annotation with default value for a field.
  * <br/>
- * This is used instead of property defaults to merge profile values as null values allowed
+ * This is used instead of property defaults to merge profile values as null values allowed.
  */
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Default {
 	String value() default "";
+
+	DefaultFormat format()  default DefaultFormat.VALUE;
+
+	String fallback() default "";
 }

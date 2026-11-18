@@ -75,9 +75,24 @@ class ExceptionUtilTest {
 	}
 
 	@Test
+	void testLogWithCause() {
+		assertDoesNotThrow(() -> ExceptionUtil.logOrThrow("error", new IllegalStateException(), true,
+				RequestDeniedException::new));
+	}
+
+	@Test
 	void testThrow() {
 		var message = "Failed!";
 		var ex = assertThrows(RequestDeniedException.class, () -> ExceptionUtil.logOrThrow(message, false,
+				RequestDeniedException::new));
+		assertThat(ex.getInternalMessage(), is(message));
+	}
+
+	@Test
+	void testThrowWithCause() {
+		var cause = new IllegalStateException("Cause");
+		var message = "Failed!";
+		var ex = assertThrows(RequestDeniedException.class, () -> ExceptionUtil.logOrThrow(message, cause, false,
 				RequestDeniedException::new));
 		assertThat(ex.getInternalMessage(), is(message));
 	}

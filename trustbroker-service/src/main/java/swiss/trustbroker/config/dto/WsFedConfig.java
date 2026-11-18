@@ -15,6 +15,8 @@
 
 package swiss.trustbroker.config.dto;
 
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -37,4 +39,22 @@ public class WsFedConfig {
 	 * Default: false
 	 */
 	private boolean enabled;
+
+	/**
+	 * List of client networks allowed (using <code>trustbroker.config.network.networkHeader</code> HTTP header).
+	 *
+	 * Default: not restricted
+	 * @since 1.16.0
+	 */
+	private List<String> allowedNetworks;
+
+	/**
+	 * Client networks enforced if configured (<code>allowedNetworks</code>).
+	 * <br/>
+	 * Default: true - set to false in order to warn for violations only
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private boolean enforceNetwork = true;
+
 }

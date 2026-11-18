@@ -26,6 +26,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
+import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -129,6 +130,17 @@ public class Definition implements Serializable, AttributeName {
 	@Deprecated(since = "1.9.0", forRemoval = true)
 	@XmlAttribute(name = "oidcMapper")
 	private ClaimsMapper oidcMapper;
+
+	/**
+	 * JSON path expression for REST response mapping.
+	 * Supports dot-notation and array iteration with []. Example: emails[].value
+	 * <br/>
+	 * When not set for REST IDM queries, defaults to the attribute name.
+	 *
+	 * @since 1.16.0
+	 */
+	@XmlElement(name = "StoreMapper")
+	private String storeMapper;
 
 	/**
 	 * Provision this attribute to IDM.

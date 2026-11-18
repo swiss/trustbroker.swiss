@@ -20,6 +20,7 @@ import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -375,6 +376,27 @@ class ApiSupportTest {
 	}, nullValues = "null")
 	void testIsSamlPath(String path, boolean expected) {
 		assertThat(ApiSupport.isSamlPath(path), is(expected));
+	}
+
+	@ParameterizedTest
+	@CsvSource({ PERIMETER_URL, PERIMETER_URL + "/", PERIMETER_URL + "//" })
+	void testGetSamlEntryPoints(String perimeterUrl) {
+		var entryPoints = ApiSupport.getSamlEntryPoints(perimeterUrl);
+		assertThat(entryPoints, is(Set.of(
+				PERIMETER_URL + ApiSupport.SAML_API,
+				PERIMETER_URL + ApiSupport.ADFS_ENTRY_URL,
+				PERIMETER_URL + ApiSupport.ADFS_ENTRY_URL_TRAILING_SLASH,
+				PERIMETER_URL + ApiSupport.XTB_LEGACY_ENTRY_URL
+		)));
+	}
+
+	@ParameterizedTest
+	@CsvSource({ PERIMETER_URL, PERIMETER_URL + "/", PERIMETER_URL + "//" })
+	void testGetWsFedEntryPoints(String perimeterUrl) {
+		var entryPoints = ApiSupport.getWsFedEntryPoints(perimeterUrl);
+		assertThat(entryPoints, is(Set.of(
+				PERIMETER_URL + ApiSupport.WSFED_API
+		)));
 	}
 
 	@ParameterizedTest

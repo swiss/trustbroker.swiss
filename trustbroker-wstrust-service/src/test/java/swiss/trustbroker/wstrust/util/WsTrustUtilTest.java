@@ -19,67 +19,22 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.Collections;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.soap.wstrust.WSTrustConstants;
-import org.springframework.mock.web.MockHttpServletRequest;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
-import swiss.trustbroker.config.dto.NetworkConfig;
 
 class WsTrustUtilTest {
 
 	@BeforeAll
 	static void setupAll() {
 		SamlInitializer.initSamlSubSystem();
-	}
-
-	@ParameterizedTest
-	@MethodSource
-	void isNetworkAllowed(String network, List<String> allowedNetworks, boolean enforce, boolean expected) {
-		var config = givenNetworkConfig();
-		var request = new MockHttpServletRequest();
-		if (network != null) {
-			request.addHeader(config.getNetworkHeader(), network);
-		}
-		assertThat(WsTrustUtil.isNetworkAllowed(allowedNetworks, enforce, request, config), is(expected));
-	}
-
-	static Object[][] isNetworkAllowed() {
-		var config = givenNetworkConfig();
-		return new Object[][] {
-				{ null, null, false, true },
-				{ null, null, true, true },
-				{ config.getInternetNetworkName(), null, true, true },
-				{ config.getInternetNetworkName(), Collections.emptyList(), true, true },
-				{ config.getInternetNetworkName(), List.of(config.getIntranetNetworkName()), false, true }, // not enforced, NOK
-				{ config.getInternetNetworkName(), List.of(config.getInternetNetworkName()), true, true }, // enforced,OK
-				{ config.getIntranetNetworkName(), List.of(config.getInternetNetworkName(), config.getIntranetNetworkName()),
-						true, true }, // enforced,OK
-				{ config.getInternetNetworkName(), List.of(config.getIntranetNetworkName()), true, false } // enforced, OK
-		};
-	}
-
-	@ParameterizedTest
-	@CsvSource(value = {
-		"null,null,false,true",
-		"10.10.10.10,null,false,true",
-		"10.10.10.10,null,true,true",
-		"10.10.10.10,,true,true",
-		"10.10.10.10,^99\\..*$,false,true", // not enforced, NOK
-		"10.10.10.10,^99\\.*$,true,false", // enforced, NOK
-		"10.10.10.10,^(99\\..*|10\\.99\\..*)$,true,false", // enforced, NOK
-		"10.10.10.10,^(99\\..*|10\\.10\\..*)$,true,true" // enforced, OK
-	}, nullValues = "null")
-	void isClientIpAllowed(String ip, String regex, boolean enforce, boolean expected) {
-		assertThat(WsTrustUtil.isClientIpAllowed(regex, enforce, ip), is(expected));
 	}
 
 	@ParameterizedTest
@@ -107,12 +62,5 @@ class WsTrustUtilTest {
 	void getAuthnContextClasses() {
 		var assertion = WsTrustTestUtil.givenAssertion();
 		assertThat(WsTrustUtil.getAuthnContextClasses(assertion), is(List.of(WsTrustTestUtil.CONTEXT_CLASS)));
-	}
-
-	private static NetworkConfig givenNetworkConfig() {
-		return NetworkConfig.builder()
-							.intranetNetworkName("INTRANET")
-							.internetNetworkName("INTERNET")
-		                    .build();
 	}
 }

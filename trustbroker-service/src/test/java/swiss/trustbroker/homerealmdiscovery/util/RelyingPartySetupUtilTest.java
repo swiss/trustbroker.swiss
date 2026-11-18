@@ -44,6 +44,7 @@ import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.CoreAttributeName;
 import swiss.trustbroker.common.saml.util.SamlContextClass;
 import swiss.trustbroker.federation.xmlconfig.AcClass;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.AccessRequest;
 import swiss.trustbroker.federation.xmlconfig.AnnouncementRpConfig;
@@ -59,6 +60,8 @@ import swiss.trustbroker.federation.xmlconfig.ClaimsProviderSetup;
 import swiss.trustbroker.federation.xmlconfig.ClientAuthenticationMethod;
 import swiss.trustbroker.federation.xmlconfig.ClientAuthenticationMethods;
 import swiss.trustbroker.federation.xmlconfig.Definition;
+import swiss.trustbroker.federation.xmlconfig.IdmLookup;
+import swiss.trustbroker.federation.xmlconfig.IdmQuery;
 import swiss.trustbroker.federation.xmlconfig.Oidc;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.OidcSecurityPolicies;
@@ -66,6 +69,7 @@ import swiss.trustbroker.federation.xmlconfig.ProfileSelection;
 import swiss.trustbroker.federation.xmlconfig.ProfileSelectionMode;
 import swiss.trustbroker.federation.xmlconfig.Qoa;
 import swiss.trustbroker.federation.xmlconfig.QoaComparison;
+import swiss.trustbroker.federation.xmlconfig.QueryControl;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.federation.xmlconfig.Scopes;
 
@@ -515,7 +519,8 @@ class RelyingPartySetupUtilTest {
 				.federationId("Saml.IssuerId")
 				.clientSecret("per client")
 				// aggregate
-				.redirectUris(AcWhitelist.builder().acUrls(new ArrayList<>(List.of("url1", "url2"))).build())
+				.redirectUris(AcWhitelist.builder().acUrls(
+						new ArrayList<>(List.of(AcUrl.of("http://url1"), AcUrl.of("http://url2")))).build())
 				.claimsSelection(AttributesSelection.builder().definitions(new ArrayList<>(List.of(
 						Definition.builder().name("ClientAddOnClaim").build()))).build())
 				.oidcSecurityPolicies(OidcSecurityPolicies.builder()
@@ -529,7 +534,8 @@ class RelyingPartySetupUtilTest {
 				.qoa(Qoa.builder().classes(List.of(AcClass.builder().contextClass("qoa10").build())).build())
 				.build();
 		var base = OidcClient.builder()
-				.redirectUris(AcWhitelist.builder().acUrls(List.of("url3", "url4")).build())
+				.redirectUris(AcWhitelist.builder().acUrls(
+						new ArrayList<>(List.of(AcUrl.of("http://url3"), AcUrl.of("http://url4")))).build())
 				.claimsSelection(AttributesSelection.builder().definitions(defsBase).build())
 				.oidcSecurityPolicies(OidcSecurityPolicies.builder()
 						.build())
@@ -558,7 +564,8 @@ class RelyingPartySetupUtilTest {
 		expected.getClaimsSelection().getDefinitions().addAll(base.getClaimsSelection().getDefinitions());
 
 		assertThat(client, is(expected));
-		assertThat(client.getRedirectUris().getAcUrls(), containsInAnyOrder("url1", "url2", "url3", "url4"));
+		assertThat(client.getRedirectUris().getAcUrls(),
+				containsInAnyOrder(AcUrl.of("http://url1"), AcUrl.of("http://url2"), AcUrl.of("http://url3"), AcUrl.of("http://url4")));
 		assertThat(client.getClaimsSelection().getDefinitions(), containsInAnyOrder(defsExpected.toArray()));
 	}
 
@@ -747,6 +754,23 @@ class RelyingPartySetupUtilTest {
 		}
 	}
 
+	@Test
+	void mergeIdmQueriesCopiesMissingQueryControlFromBaseAndKeepsRpOverride() {
+		var rpQuery = IdmQuery.builder().id("q1").name("IDENTITY").queryControl(null).build();
+		var rpLookup = IdmLookup.builder().queries(new ArrayList<>(List.of(rpQuery))).build();
+		var relyingParty = RelyingParty.builder().id("rp1").idmLookup(rpLookup).build();
+
+		var baseQuery = IdmQuery.builder().id("q1").name("IDENTITY").queryControl(QueryControl.ADDITIONAL).build();
+		var baseLookup = IdmLookup.builder().queries(List.of(baseQuery)).build();
+
+		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup);
+		assertEquals(QueryControl.ADDITIONAL.name(), relyingParty.getIdmLookup().getQueries().getFirst().getQueryControl());
+
+		relyingParty.getIdmLookup().getQueries().getFirst().setQueryControl(QueryControl.PRIMARY);
+		RelyingPartySetupUtil.mergeIdmQueries(relyingParty, baseLookup);
+		assertEquals(QueryControl.PRIMARY.name(), relyingParty.getIdmLookup().getQueries().getFirst().getQueryControl());
+	}
+
 	static Object[][] mergeOidcQoaLevelsTest() {
 		var accClasses = List.of(AcClass.builder().contextClass("qoa1").build());
 		return new Object[][]{
@@ -754,9 +778,15 @@ class RelyingPartySetupUtilTest {
 				{ null, Qoa.builder().enforce(true).build(), Qoa.builder().enforce(true).build() },
 				{ Qoa.builder().enforce(true).build(), null, Qoa.builder().enforce(true).build() },
 				{ Qoa.builder().enforce(true).build(), Qoa.builder().enforce(false).build(), Qoa.builder().enforce(true).build() },
-				{ Qoa.builder().enforce(true).build(), Qoa.builder().enforce(false).mapOutbound(false).build(), Qoa.builder().enforce(true).mapOutbound(true).build() },
-				{ Qoa.builder().enforce(true).comparison(QoaComparison.MINIMUM).build(), Qoa.builder().enforce(true).comparison(QoaComparison.EXACT).build(), Qoa.builder().comparison(QoaComparison.MINIMUM).enforce(true).build() },
-				{ Qoa.builder().enforce(true).comparison(QoaComparison.MINIMUM).build(), Qoa.builder().enforce(true).comparison(QoaComparison.EXACT).classes(accClasses).build(), Qoa.builder().comparison(QoaComparison.MINIMUM).classes(accClasses).enforce(true).build() }
+				{ Qoa.builder().enforce(true).build(),
+						Qoa.builder().enforce(false).mapOutbound(false).build(),
+						Qoa.builder().enforce(true).mapOutbound(false).build() },
+				{ Qoa.builder().enforce(true).comparison(QoaComparison.MINIMUM).build(),
+						Qoa.builder().enforce(true).comparison(QoaComparison.EXACT).build(),
+						Qoa.builder().comparison(QoaComparison.MINIMUM).enforce(true).build() },
+				{ Qoa.builder().enforce(true).comparison(QoaComparison.MINIMUM).build(),
+						Qoa.builder().enforce(true).comparison(QoaComparison.EXACT).classes(accClasses).build(),
+						Qoa.builder().comparison(QoaComparison.MINIMUM).classes(accClasses).enforce(true).build() }
 		};
 	}
 }

@@ -181,12 +181,12 @@ public class OidcClaimValidatorService {
 		                         .toList();
 
 
-		if (acrStringList.isEmpty() && configQoa.hasConfig() && configQoa.config().enforce()) {
+		if (acrStringList.isEmpty() && configQoa.hasConfig() && configQoa.config().getEnforce()) {
 			QoaMappingUtil.missingQoaException(comparison, expectedClasses, configQoa);
 		}
 
 		for (String acr : acrStringList) {
-			QoaMappingUtil.validateContextClass(comparison, expectedClasses, configQoa, acr, configQoa, counterParty.getId(), trustBrokerProperties.getQoaMap(), !qoa.enforce());
+			QoaMappingUtil.validateContextClass(comparison, expectedClasses, configQoa, acr, configQoa, counterParty.getId(), trustBrokerProperties.getQoaMap(), !qoa.getEnforce());
 		}
 	}
 

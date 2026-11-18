@@ -261,10 +261,10 @@ public class ScriptService {
 		processAllSamlScripts(hook, scripts, cpResponse, response, null, null);
 	}
 
-	public void processOnMessage() {
+	public void processOnMessage(String messageProcessingScript) {
 		var hook = "OnMessage";
-		var script = resolveScript("PenTestScenarios.groovy");
-		processAllOidcScripts(hook, List.of(script), null);
+		var script = resolveScript(messageProcessingScript);
+		processOnResponse(hook, script);
 	}
 
 	public boolean processRpWsTrustOnAssertion(RequestSecurityToken request,
@@ -287,19 +287,35 @@ public class ScriptService {
 
 	// CP side script hooks
 
-	public void processCpBeforeRequest(String cpIssuer, RpRequest rpRequest) {
+	public void processRpBeforeCpRequest(String issuer, RpRequest rpRequest) {
+		processBeforeCpRequest(issuer, rpRequest, true);
+	}
+
+	public void processCpBeforeCpRequest(String issuer, RpRequest rpRequest) {
+		processBeforeCpRequest(issuer, rpRequest, false);
+	}
+
+	private void processBeforeCpRequest(String issuer, RpRequest rpRequest, boolean rpSide) {
 		var hook = SCRIPT_TYPE_BEFORE_CP_REQUEST;
-		var scripts = getScriptsByType(cpIssuer, null, hook, false);
+		var scripts = getScriptsByType(issuer, null, hook, rpSide);
 		for (var script : scripts) {
 			processOnRequest(hook, script, rpRequest, null);
 		}
 	}
 
-	public void processCpOnRequest(String cpIssuer, RequestAbstractType samlRequest) {
+	public void processRpOnCpRequest(String issuer, RpRequest rpRequest, RequestAbstractType samlRequest) {
+		processOnCpRequest(issuer, rpRequest, samlRequest, true);
+	}
+
+	public void processCpOnCpRequest(String issuer, RpRequest rpRequest, RequestAbstractType samlRequest) {
+		processOnCpRequest(issuer, rpRequest, samlRequest, false);
+	}
+
+	private void processOnCpRequest(String issuer, RpRequest rpRequest, RequestAbstractType samlRequest, boolean rpSide) {
 		var hook = SCRIPT_TYPE_ON_CP_REQUEST;
-		var scripts = getScriptsByType(cpIssuer, null, hook, false);
+		var scripts = getScriptsByType(issuer, null, hook, rpSide);
 		for (var script : scripts) {
-			processOnRequest(hook, script, null, samlRequest);
+			processOnRequest(hook, script, rpRequest, samlRequest);
 		}
 	}
 
@@ -405,6 +421,10 @@ public class ScriptService {
 		processOnResponse("TestStep", compiledScript, cpResponse, response, wsTrustResponse, idmQueries);
 	}
 
+	private void processOnResponse(String hookType, Pair<String, CompiledScript> script) throws TechnicalException {
+		processOnResponse(hookType, script, null, null, null, null);
+	}
+
 	private void processOnResponse(String hookType, Pair<String, CompiledScript> script,
 								   CpResponse cpResponse, Response response, WSTrustObject wsTrustResponse,
 								   List<IdmQuery> idmQueries) throws TechnicalException {
@@ -496,11 +516,11 @@ public class ScriptService {
 		bindings.put(BEAN_SAML_RESPONSE, response); // null in OIDC/WS-Trust hooks
 		bindings.put(BEAN_WS_TRUST_RESPONSE, wsTrustResponse); // null in OIDC/SAML hooks
 		bindings.put(BEAN_IDM_QUERIES, idmQueries); // null in OIDC, even dangerous when modified
-		bindings.put(BEAN_HTTP_REQUEST, HttpExchangeSupport.getRunningHttpRequest()); // allow some HTTP wire based decisions
 		// input/output (documented)
-		bindings.put(BEAN_CP_RESPONSE, cpResponse); // documented, used, our main vehicle for SAML  manipulations
+		bindings.put(BEAN_CP_RESPONSE, cpResponse); // documented, used, our main vehicle for SAML manipulations
+		// bind HTTPRequest/HTTPResponse and LOG
 		bindHttpCommonBeans(bindings);
-		// RPRequest not persisted, dervice it from inbound data of CPresponse
+		// RPRequest not persisted, derive it from inbound data of CPresponse
 		if (cpResponse != null) {
 			bindings.put(BEAN_RP_REQUEST, deriveRpRequestFromCpResponse(cpResponse));
 		}

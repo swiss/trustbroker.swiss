@@ -37,10 +37,10 @@ public class OidcProperties {
 	/**
 	 * OIDC protocol enabled.
 	 * <br/>
-	 * Default: true
+	 * Default: false (since 1.16.0, but global application.yml still has true)
 	 * @since 1.14.0
 	 */
-	private boolean enabled = true;
+	private boolean enabled;
 
 	/**
 	 * XTB OIDC issuer ID.
@@ -385,7 +385,7 @@ public class OidcProperties {
 	 *
 	 * @since 1.10.0
 	 */
-	private long minimumMetadataCacheTimeSecs = 60l;
+	private long minimumMetadataCacheTimeSecs = 60L;
 
 	/**
 	 * Allow token exchange with external tokens.

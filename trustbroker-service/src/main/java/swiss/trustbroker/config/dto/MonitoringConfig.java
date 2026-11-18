@@ -37,4 +37,14 @@ public class MonitoringConfig {
 	 * Default: false
 	 */
 	private boolean enabled;
+
+	/**
+	 * Support the /api/v1/monitoring/health endpoint to be provided by a script.
+	 * <br/>
+	 * Default: undefined
+	 *
+	 *  @since 1.16.0
+	 */
+	private String healthCheckScript;
+
 }

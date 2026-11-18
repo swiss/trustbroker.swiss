@@ -17,7 +17,6 @@ package swiss.trustbroker.oidc.tx;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,17 +28,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletResponseWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.web.header.writers.frameoptions.XFrameOptionsHeaderWriter;
-import org.springframework.web.util.UriComponentsBuilder;
-import org.springframework.web.util.UriUtils;
-import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
+import swiss.trustbroker.oidc.OidcCtxPropagator;
 import swiss.trustbroker.oidc.OidcExceptionHelper;
 import swiss.trustbroker.oidc.OidcFrameAncestorHandler;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.HeaderBuilder;
-import swiss.trustbroker.util.HrdSupport;
 
 @Slf4j
 public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
@@ -158,9 +154,9 @@ public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
 			// fragment handling on ?code=X redirects (as spring-security ignores it)
 			location = FragmentUtil.checkAndFixRedirectUri(location, request.getSession(false), responseMode);
 
-			// ACR handling
+			// ACR and other OAuth2 context
 			if (location.contains(ApiSupport.SPRING_SAML_AUTHENTICATE_CTXPATH)) {
-				location = addAuthenticationContextParams(location);
+				location = OidcCtxPropagator.addOauth2AuthorizeContext(location, request, trustBrokerProperties);
 			}
 
 			// Keycloak realm compatibility (turned off per default)
@@ -208,35 +204,8 @@ public class OidcTxResponseWrapper extends HttpServletResponseWrapper {
 		}
 	}
 
-	// handle acr on top of spring-security
-	private String addAuthenticationContextParams(String location) {
-		var ret = location;
-		var requestURI = request.getRequestURI();
-		if (requestURI.endsWith(ApiSupport.SPRING_OAUTH2_AUTHORIZE_CTXPATH)) {
-			var clientId = request.getParameter(OidcUtil.OIDC_CLIENT_ID);
-			var acrValues = request.getParameter(OidcUtil.OIDC_ACR_VALUES);
-			var promptLogin = request.getParameter(OidcUtil.OIDC_PROMPT);
-			var hrdHint = HrdSupport.getHrdHintParameter(request, trustBrokerProperties);
-			var uriComponentsBuilder = UriComponentsBuilder.fromUriString(location);
-			if (acrValues != null) {
-				uriComponentsBuilder.queryParam(OidcUtil.OIDC_ACR_VALUES, UriUtils.encode(acrValues, StandardCharsets.UTF_8));
-			}
-			if (clientId != null) {
-				uriComponentsBuilder.queryParam(OidcUtil.OIDC_CLIENT_ID, UriUtils.encode(clientId, StandardCharsets.UTF_8));
-			}
-			if (promptLogin != null) {
-				uriComponentsBuilder.queryParam(OidcUtil.OIDC_PROMPT, UriUtils.encode(promptLogin, StandardCharsets.UTF_8));
-			}
-			if (hrdHint != null) {
-				uriComponentsBuilder.queryParam(trustBrokerProperties.getHrdHintParameter(), UriUtils.encode(hrdHint, StandardCharsets.UTF_8));
-			}
-			ret = uriComponentsBuilder.build().toUriString();
-		}
-		log.debug("Constructed redirectUrl='{}' with parameters from request context", ret);
-		return ret;
-	}
-
 	public HeaderBuilder headerBuilder() {
 		return headerBuilder;
 	}
+
 }

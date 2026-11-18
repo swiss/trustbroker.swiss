@@ -35,6 +35,7 @@ import swiss.trustbroker.common.tracing.Traced;
 import swiss.trustbroker.common.util.HttpUtil;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.WebUtil;
+import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.federation.xmlconfig.Certificates;
 import swiss.trustbroker.federation.xmlconfig.OidcClaimsSource;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
@@ -52,6 +53,8 @@ import swiss.trustbroker.oidc.client.dto.OpenIdProviderConfiguration;
 class OidcUserinfoService {
 
 	private final OidcHttpClientProvider httpClientProvider;
+
+	private final TrustBrokerProperties trustBrokerProperties;
 
 	@Traced
 	@Timed("oidc_userinfo_fetch")
@@ -87,7 +90,8 @@ class OidcUserinfoService {
 				return OidcUtil.parseJwtClaims(httpResponse.body());
 			}
 			if (mimeType.equalsTypeAndSubtype(OidcUtil.MIME_TYPE_JWT)) {
-				return OidcUtil.verifyJwtToken(httpResponse.body(), keySupplier, client.getId());
+				return OidcUtil.verifyJwtToken(httpResponse.body(), keySupplier, client.getId(),
+						trustBrokerProperties.getSecurity().isRequireSignedResponseToken());
 			}
 			throw new TechnicalException(String.format(
 					"oidcClientId=%s GET to userinfoEndpoint=%s returned unsupported contentType=%s",

@@ -23,7 +23,8 @@
 
 package swiss.trustbroker.oidc.pkce;
 
-import jakarta.annotation.Nullable;
+import javax.annotation.Nullable;
+
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;

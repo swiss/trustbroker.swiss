@@ -27,6 +27,7 @@ import static swiss.trustbroker.config.TestConstants.TEST_SSO_GROUP_SETUP;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.opensaml.saml.common.SAMLObject;
@@ -52,6 +53,7 @@ import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.api.idm.service.IdmStatusPolicyCallback;
 import swiss.trustbroker.api.relyingparty.dto.RelyingPartyConfig;
 import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
+import swiss.trustbroker.common.dto.AcceptedUrlFormat;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.saml.util.SamlIoUtil;
@@ -156,7 +158,8 @@ public class ServiceSamlTestUtil implements SamlHttpTestBase {
 			relyingParty.setRpSigner(credential);
 			relyingParty.setRpTrustCredentials(List.of(credential));
 			if (relyingParty.getAcWhitelist() != null) {
-				relyingParty.getAcWhitelist().calculateDerivedUrls();
+				// @Default is not applied - set default format for test
+				relyingParty.getAcWhitelist().calculateDerivedUrls(AcceptedUrlFormat.FULL, Optional.empty());
 			}
 		}
 		return rulesDefinitions;

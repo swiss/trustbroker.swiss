@@ -123,7 +123,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.of(oidcClient));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		customizer.customize(context);
@@ -141,7 +141,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.empty());
 
 		mockClaims(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 
 		var exception = assertThrows(TechnicalException.class, () -> customizer.customize(context));
 		assertThat(exception.getInternalMessage(), is("Missing OIDC client configuration for=" + CLIENT_ID));
@@ -155,7 +155,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.of(oidcClient));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 
 		customizer.customize(context);
 
@@ -168,7 +168,7 @@ class TokenExchangeResponseCustomizerTest {
 		when(relyingPartyDefinitions.getOidcClientConfigById(CLIENT_ID, properties))
 				.thenReturn(Optional.of(oidcClient));
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		customizer.customize(context);
@@ -183,7 +183,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.of(oidcClient));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var claimsSet = mock(JwtClaimsSet.class);
@@ -202,7 +202,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.of(oidcClient));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var claimsSet = mock(JwtClaimsSet.class);
@@ -221,7 +221,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.of(oidcClient));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var claimsSet = mock(JwtClaimsSet.class);
@@ -240,7 +240,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.of(oidcClient));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var claimsSet = mock(JwtClaimsSet.class);
@@ -260,7 +260,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.of(oidcClient));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var claimsSet = mock(JwtClaimsSet.class);
@@ -280,7 +280,7 @@ class TokenExchangeResponseCustomizerTest {
 				.thenReturn(Optional.of(oidcClient));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 		mockJwsHeader();
 
@@ -305,7 +305,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("another_claim", 12345);
 
 		mockClaims(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var tokenExchangeToken = mock(OAuth2TokenExchangeAuthenticationToken.class);
@@ -349,7 +349,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("role", "admin");
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var authorization = mock(OAuth2Authorization.class);
@@ -377,7 +377,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("instant_claim", instantValue);
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var tokenExchangeToken = mock(OAuth2TokenExchangeAuthenticationToken.class);
@@ -405,7 +405,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("date_claim", dateValue);
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var tokenExchangeToken = mock(OAuth2TokenExchangeAuthenticationToken.class);
@@ -432,7 +432,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("single_collection", List.of("single_value"));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var tokenExchangeToken = mock(OAuth2TokenExchangeAuthenticationToken.class);
@@ -459,7 +459,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("multi_collection", List.of("value1", "value2", "value3"));
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var tokenExchangeToken = mock(OAuth2TokenExchangeAuthenticationToken.class);
@@ -489,7 +489,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("cnf", mapValue);
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var tokenExchangeToken = mock(OAuth2TokenExchangeAuthenticationToken.class);
@@ -516,7 +516,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("null_claim", null);
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var tokenExchangeToken = mock(OAuth2TokenExchangeAuthenticationToken.class);
@@ -544,7 +544,7 @@ class TokenExchangeResponseCustomizerTest {
 		attributes.put("string_key", "string_key_value");
 
 		mockClaimBuilder(context);
-		mockRegisteredClientWithGrantType(AuthorizationGrantType.TOKEN_EXCHANGE);
+		mockRegisteredClientWithGrantType();
 		mockProperties();
 
 		var tokenExchangeToken = mock(OAuth2TokenExchangeAuthenticationToken.class);
@@ -562,29 +562,44 @@ class TokenExchangeResponseCustomizerTest {
 	}
 
 	@ParameterizedTest
-	@MethodSource("convertStringToMapCases")
-	void convertStringToMapCases(List<String> input, Object expected) {
-		Object result = assertDoesNotThrow(() -> customizer.convertStringToMap(input));
+	@MethodSource("tryParseJsonCases")
+	void tryParseJsonCases(String input, Object expected) {
+		Object result = assertDoesNotThrow(() -> TokenExchangeResponseCustomizer.tryParseJson(input));
 		assertEquals(expected, result);
 	}
 
-	private static Stream<Arguments> convertStringToMapCases() {
+	private static Stream<Arguments> tryParseJsonCases() {
 		return Stream.of(
 				Arguments.of(null, null),
-				Arguments.of(List.of(), List.of()),
-				Arguments.of(List.of("a", "b"), List.of("a", "b")),
-				Arguments.of(java.util.Collections.singletonList(null), java.util.Collections.singletonList(null)),
-				Arguments.of(List.of("plain-value"), List.of("plain-value")),
-				Arguments.of(List.of("{}"), Map.of()),
-				Arguments.of(List.of("{k1=v1, k2=v2}"), Map.of("k1", "v1", "k2", "v2")),
-				Arguments.of(List.of("{broken}"), "{broken}")
+				Arguments.of("plain-value", "plain-value"),
+				Arguments.of("not-json", "not-json"),
+				// empty array -> kept as-is string
+				Arguments.of("[]", "[]"),
+				// normal array -> kept as-is string
+				Arguments.of("[1,2]", "[1,2]"),
+				// plain string array -> kept as-is string (NOT parsed)
+				Arguments.of("[\"a\",\"b\"]", "[\"a\",\"b\"]"),
+				// mixed array (object + scalar) -> kept as-is string
+				Arguments.of("[{\"k\":\"v\"},\"x\"]", "[{\"k\":\"v\"},\"x\"]"),
+				// JSON object -> Map
+				Arguments.of(
+						"{\"subjectDN\":\"CN=Muster Max, OU=W, O=A, C=CH\",\"issuerDN\":\"CN=Enhanced CA, OU=Certification, OU=S, O=A, C=CH\"}",
+						Map.of("subjectDN", "CN=Muster Max, OU=W, O=A, C=CH",
+								"issuerDN", "CN=Enhanced CA, OU=Certification, OU=S, O=A, C=CH")),
+				// JSON array of objects -> List of Maps
+				Arguments.of(
+						"[{\"subjectDN\":\"CN=Muster Max, OU=W, O=A, C=CH\",\"issuerDN\":\"CN=Enhanced CA, OU=Certification, OU=S, O=A, C=CH\"}]",
+						List.of(Map.of("subjectDN", "CN=Muster Max, OU=W, O=A, C=CH",
+								"issuerDN", "CN=Enhanced CA, OU=Certification, OU=S, O=A, C=CH"))),
+				// malformed JSON starting with { -> kept as string
+				Arguments.of("{broken}", "{broken}")
 		);
 	}
 
-	private void mockRegisteredClientWithGrantType(AuthorizationGrantType grantType) {
+	private void mockRegisteredClientWithGrantType() {
 		RegisteredClient registeredClient = RegisteredClient.withId(CLIENT_ID)
 		                                                    .clientId(CLIENT_ID)
-		                                                    .authorizationGrantType(grantType)
+		                                                    .authorizationGrantType(AuthorizationGrantType.TOKEN_EXCHANGE)
 		                                                    .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
 		                                                    .build();
 		when(context.getRegisteredClient()).thenReturn(registeredClient);

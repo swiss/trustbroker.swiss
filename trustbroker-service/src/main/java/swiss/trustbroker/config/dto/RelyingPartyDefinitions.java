@@ -37,10 +37,12 @@ import org.opensaml.security.x509.X509Credential;
 import org.springframework.security.saml2.core.Saml2X509Credential;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import swiss.trustbroker.common.dto.AcceptedUrl;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.CredentialReader;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.AuthorizedApplication;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
@@ -202,7 +204,7 @@ public class RelyingPartyDefinitions {
 
 	static void updateAcWhitelistFromOidcClients(RelyingParty relyingParty, OidcProperties oidcProperties) {
 		var clients = relyingParty.getOidcClients();
-		Set<String> calculatedAcsUrls = new HashSet<>();
+		Set<AcUrl> calculatedAcsUrls = new HashSet<>();
 		for (var client : clients) {
 			calculateAclUrls(client, oidcProperties, calculatedAcsUrls);
 		}
@@ -219,7 +221,9 @@ public class RelyingPartyDefinitions {
 		}
 	}
 
-	private static void calculateAclUrls(OidcClient client, OidcProperties oidcProperties, Set<String> calculatedAcsUrls) {
+	@SuppressWarnings("unchecked")
+	private static <T extends AcceptedUrl> void calculateAclUrls(OidcClient client, OidcProperties oidcProperties,
+			Set<T> calculatedAcsUrls) {
 		var perimeterUrl = oidcProperties.getPerimeterUrl();
 		if (!StringUtils.hasText(perimeterUrl)) {
 			return;
@@ -227,7 +231,7 @@ public class RelyingPartyDefinitions {
 		try {
 			// ensure there is at least one trailing slash (URI takes care of doubles)
 			var uri = new URI(perimeterUrl + '/');
-			calculatedAcsUrls.add(uri.resolve(client.getId()).toString());
+			calculatedAcsUrls.add((T) AcUrl.of(uri.resolve(client.getId()).toString())); // T always AcUrl here
 		}
 		catch (URISyntaxException ex) {
 			throw new TechnicalException(String.format("Invalid oidc.perimeterUrls url=%s ex=%s",

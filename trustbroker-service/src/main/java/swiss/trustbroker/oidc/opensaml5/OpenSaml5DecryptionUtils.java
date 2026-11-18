@@ -26,8 +26,8 @@
 package swiss.trustbroker.oidc.opensaml5;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
 import org.opensaml.saml.saml2.core.Assertion;
 import org.opensaml.saml.saml2.core.Attribute;
@@ -61,7 +61,7 @@ import org.springframework.security.saml2.provider.service.registration.RelyingP
 final class OpenSaml5DecryptionUtils {
 
 	private static final EncryptedKeyResolver encryptedKeyResolver = new ChainingEncryptedKeyResolver(
-			Arrays.asList(new InlineEncryptedKeyResolver(), new EncryptedElementTypeEncryptedKeyResolver(),
+			List.of(new InlineEncryptedKeyResolver(), new EncryptedElementTypeEncryptedKeyResolver(),
 					new SimpleRetrievalMethodEncryptedKeyResolver()));
 
 	static void decryptResponseElements(Response response, RelyingPartyRegistration registration) {

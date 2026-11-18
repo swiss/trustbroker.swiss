@@ -121,7 +121,8 @@ public class AuthorizationCodeFlowService {
 							OidcUtil.TOKEN_RESPONSE_ID_TOKEN, client.getId(), configuration.getTokenEndpoint()));
 		}
 		var cpDecryptionCredential = client.getClientEncryptionCredential();
-		var claims = OidcUtil.decryptAndVerifyToken(idTokenString, keySupplier, cpDecryptionCredential, client.getId());
+		var claims = OidcUtil.decryptAndVerifyToken(idTokenString, keySupplier, cpDecryptionCredential, client.getId(),
+				trustBrokerProperties.getSecurity().isRequireSignedResponseToken());
 		log.debug("OIDC {} client={} tokenEndpoint={} claims={}", OidcUtil.TOKEN_RESPONSE_ID_TOKEN, client.getId(),
 				configuration.getTokenEndpoint(), claims);
 		oidcClaimValidatorService.validateClaims(claims, claimsParty, client, configuration.getIssuerId(),

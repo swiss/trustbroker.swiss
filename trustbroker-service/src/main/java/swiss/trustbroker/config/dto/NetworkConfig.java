@@ -113,6 +113,19 @@ public class NetworkConfig {
 	@Builder.Default
 	private int backendConnectTimeoutSec = 30;
 
+	/**
+	 * Backend service response timeout in seconds.
+	 * <br/>
+	 * Applies to the total time allowed to receive a complete response after the connection is established.
+	 * <br/>
+	 * Default: 30
+	 *
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private int backendResponseTimeoutSec = 30;
+
+
 	public boolean isIntranet(String name) {
 		return StringUtils.isNotEmpty(intranetNetworkName) && intranetNetworkName.equals(name);
 	}

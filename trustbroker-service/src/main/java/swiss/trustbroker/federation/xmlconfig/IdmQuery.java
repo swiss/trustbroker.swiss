@@ -76,6 +76,14 @@ public class IdmQuery implements Serializable, IdmRequest {
 	private String store;
 
 	/**
+	 * Connection service name to select from configured LDAP stores or REST services.
+	 * If not specified, falls back to the {@link #store} attribute.
+	 * @since 1.16.0
+	 */
+	@XmlAttribute(name = "connection")
+	private String connection;
+
+	/**
 	 * SAML federation filter to be applied to the user query.
 	 */
 	@XmlAttribute(name = "issuerNameId")
@@ -93,6 +101,14 @@ public class IdmQuery implements Serializable, IdmRequest {
 	 */
 	@XmlAttribute(name = "statusPolicy")
 	private StatusPolicy statusPolicy;
+
+	/**
+	 * Defines the query control deciding whether a query performs primary user lookup or additional enrichment.
+	 *
+	 * @since 1.16.0
+	 */
+	@XmlAttribute(name = "queryControl")
+	private QueryControl queryControl;
 
 	/**
 	 * Client External ID (tenant) as filtering parameter for the IDM.
@@ -133,6 +149,15 @@ public class IdmQuery implements Serializable, IdmRequest {
 		return statusPolicy != null ? statusPolicy : StatusPolicy.FETCH_ACTIVE_ONLY;
 	}
 
+	public QueryControl queryControlWithDefault() {
+		return queryControl != null ? queryControl : QueryControl.PRIMARY;
+	}
+
+	@JsonIgnore
+	public QueryControl getConfiguredQueryControl() {
+		return queryControl;
+	}
+
 	@JsonIgnore
 	@Override
 	public boolean isFetchActiveOnly() {
@@ -151,6 +176,12 @@ public class IdmQuery implements Serializable, IdmRequest {
 	@Override
 	public String getUserStatusPolicy() {
 		return statusPolicyWithDefault().name();
+	}
+
+	@JsonIgnore
+	@Override
+	public String getQueryControl() {
+		return queryControlWithDefault().name();
 	}
 
 	@JsonIgnore
@@ -179,15 +210,18 @@ public class IdmQuery implements Serializable, IdmRequest {
 	private static IdmQuery ofRequest(IdmRequest idmRequest) {
 		var issuerNameIdAttribute = idmRequest.getIssuerNameIdAttribute();
 		var subjectNameIdAttribute = idmRequest.getSubjectNameIdAttribute();
-		var result =  IdmQuery.builder()
+		var result = IdmQuery.builder()
 				.id(idmRequest.getId())
 				.name(idmRequest.getName())
+				.store(idmRequest.getStore())
+				.connection(idmRequest.getConnection())
 				.issuerNameId(issuerNameIdAttribute != null ? issuerNameIdAttribute.getName() : null)
 				.issuerNameIdNS(issuerNameIdAttribute != null ? issuerNameIdAttribute.getNamespaceUri() : null)
 				.subjectNameId(subjectNameIdAttribute != null ? subjectNameIdAttribute.getName() : null)
 				.clientExtId(idmRequest.getClientExtId())
 				.appFilter(idmRequest.getAppFilter())
 				.statusPolicy(StatusPolicy.of(idmRequest.getUserStatusPolicy()))
+				.queryControl(QueryControl.of(idmRequest.getQueryControl()))
 				.build();
 		copyUserDetailsSelection(idmRequest.getAttributeSelection(), result);
 		return result;

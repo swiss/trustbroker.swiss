@@ -49,9 +49,9 @@ public class Qoa implements Serializable {
 	 *
 	 * @since 1.9.0
 	 */
+	@Default("false")
 	@XmlAttribute(name = "enforce")
-	@Builder.Default
-	private Boolean enforce = null;
+	private Boolean enforce;
 
 	/**
 	 * Enable mapping of outbound QoA.
@@ -61,8 +61,8 @@ public class Qoa implements Serializable {
 	 * @since 1.9.0
 	 */
 	@XmlAttribute(name = "mapOutbound")
-	@Builder.Default
-	private Boolean mapOutbound = Boolean.TRUE;
+	@Default("true")
+	private Boolean mapOutbound;
 
 	/**
 	 * Send single QoA in response (to RP).
@@ -74,8 +74,8 @@ public class Qoa implements Serializable {
 	 * @since 1.9.0
 	 */
 	@XmlAttribute(name = "singleQoaResponse")
-	@Builder.Default
-	private Boolean singleQoaResponse = Boolean.TRUE;
+	@Default("true")
+	private Boolean singleQoaResponse;
 
 	/**
 	 * Comparison type.
@@ -93,8 +93,8 @@ public class Qoa implements Serializable {
 	 * @since 1.10.0
 	 */
 	@XmlAttribute(name = "dropUnmappable")
-	@Builder.Default
-	private Boolean dropUnmappable = Boolean.FALSE;
+	@Default("false")
+	private Boolean dropUnmappable;
 
 	/**
 	 * Default Qoa if there is none in the response
@@ -113,8 +113,8 @@ public class Qoa implements Serializable {
 	 * @since 1.10.0
 	 */
 	@XmlAttribute(name = "replaceInbound")
-	@Builder.Default
-	private Boolean replaceInbound = Boolean.FALSE;
+	@Default("false")
+	private Boolean replaceInbound;
 
 	/**
 	 * Qoa Claim name
@@ -133,25 +133,4 @@ public class Qoa implements Serializable {
 	@XmlElement(name = "ACClass")
 	@Builder.Default
 	private List<AcClass> classes = new ArrayList<>();
-
-	public boolean enforce() {
-		return Boolean.TRUE.equals(enforce);
-	}
-
-	public boolean mapOutbound() {
-		return Boolean.TRUE.equals(mapOutbound);
-	}
-
-	public boolean useSingleQoaInResponse() {
-		return Boolean.TRUE.equals(singleQoaResponse);
-	}
-
-	public boolean dropUnmappableQoas() {
-		return Boolean.TRUE.equals(dropUnmappable);
-	}
-
-	public boolean replaceInboundQoas() {
-		return Boolean.TRUE.equals(replaceInbound);
-	}
-
 }

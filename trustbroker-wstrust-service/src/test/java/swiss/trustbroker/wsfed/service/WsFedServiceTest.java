@@ -13,7 +13,7 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 
-package swiss.trustbroker.wsfed;
+package swiss.trustbroker.wsfed.service;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -47,13 +47,13 @@ import swiss.trustbroker.common.saml.dto.SamlBinding;
 import swiss.trustbroker.common.saml.dto.SignatureContext;
 import swiss.trustbroker.common.saml.util.SamlInitializer;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.homerealmdiscovery.service.RelyingPartySetupService;
 import swiss.trustbroker.saml.service.AuthenticationService;
 import swiss.trustbroker.saml.service.RelyingPartyService;
 import swiss.trustbroker.wsfed.dto.WsFedAction;
-import swiss.trustbroker.wsfed.service.WsFedService;
 import swiss.trustbroker.wsfed.util.WsFedUtil;
 
 @SpringBootTest
@@ -62,6 +62,10 @@ import swiss.trustbroker.wsfed.util.WsFedUtil;
 class WsFedServiceTest {
 
 	private static final String REFERRER = "https://wsfed.trustbroker.swiss/";
+
+	private static final String REQUEST_URI = "/api/v1/wsfed";
+
+	private static final String DESTINATION = "http://localhost" + REQUEST_URI;
 
 	private static final String REPLY_URL = REFERRER + "reply";
 
@@ -127,6 +131,7 @@ class WsFedServiceTest {
 		request.setParameter(WsFedUtil.REPLY, REPLY_URL);
 		request.setParameter(WsFedUtil.CONTEXT, CONTEXT);
 		request.setParameter(WsFedUtil.REFRESH, WsFedUtil.FORCE_AUTHN);
+		request.setRequestURI(REQUEST_URI);
 		request.addHeader(HttpHeaders.REFERER, REFERRER);
 		var response = new MockHttpServletResponse();
 		mockRelyingParty(RP_ID, REFERRER);
@@ -146,6 +151,7 @@ class WsFedServiceTest {
 		assertThat(authnRequest.getID(), is(not(CONTEXT))); // only used in response
 		assertThat(authnRequest.isForceAuthn(), is(Boolean.TRUE));
 		assertThat(authnRequest.getAssertionConsumerServiceURL(), is(REPLY_URL));
+		assertThat(authnRequest.getDestination(), is(DESTINATION));
 		var signatureContext = signatureContextCaptor.getValue();
 		assertThat(signatureContext, is(not(nullValue())));
 		assertThat(signatureContext.getBinding(), is(SamlBinding.WS_FED));
@@ -159,6 +165,7 @@ class WsFedServiceTest {
 		request.setParameter(WsFedUtil.ACTION, WsFedAction.ACTION_SIGN_OUT.getAction());
 		request.setParameter(WsFedUtil.REPLY, REPLY_URL);
 		request.addHeader(HttpHeaders.REFERER, REFERRER);
+		request.setRequestURI(REQUEST_URI);
 		var response = new MockHttpServletResponse();
 		mockRelyingPartyReplyUrl(RP_ID, REPLY_URL);
 
@@ -173,6 +180,7 @@ class WsFedServiceTest {
 		var logoutRequest = logoutRequestCaptor.getValue();
 		assertThat(logoutRequest, is(not(nullValue())));
 		assertThat(logoutRequest.getIssuer().getValue(), is(RP_ID));
+		assertThat(logoutRequest.getDestination(), is(DESTINATION));
 		var signatureContext = signatureContextCaptor.getValue();
 		assertThat(signatureContext, is(not(nullValue())));
 		assertThat(signatureContext.getBinding(), is(SamlBinding.WS_FED));
@@ -199,7 +207,7 @@ class WsFedServiceTest {
 
 	private static AcWhitelist givenAcWhitelist(List<String> acUrls) {
 		return AcWhitelist.builder()
-						  .acUrls(acUrls)
+						  .acUrls(AcUrl.asAcUrlList(acUrls))
 						  .build();
 	}
 }

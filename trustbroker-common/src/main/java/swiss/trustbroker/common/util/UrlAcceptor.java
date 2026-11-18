@@ -17,12 +17,13 @@ package swiss.trustbroker.common.util;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.Collection;
+import java.util.regex.Pattern;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
+import swiss.trustbroker.common.dto.AcceptedUrl;
+import swiss.trustbroker.common.dto.AcceptedUrlFormat;
 
 @Slf4j
 public class UrlAcceptor {
@@ -34,15 +35,15 @@ public class UrlAcceptor {
 	}
 
 	// Check HTTP Origin header against configured ACLs
-	public static boolean isTrustedOrigin(String origin, Set<String> acUrls) {
+	public static boolean isTrustedOrigin(String origin, Collection<? extends AcceptedUrl> acUrls) {
 		return isUrlOkForAccess(origin, acUrls, true);
 	}
 
-	public static boolean isRedirectUrlOkForAccess(String requestedRedirectUri, Set<String> acUrls) {
+	public static boolean isRedirectUrlOkForAccess(String requestedRedirectUri, Collection<? extends AcceptedUrl> acUrls) {
 		return isUrlOkForAccess(requestedRedirectUri, acUrls, false);
 	}
 
-	private static boolean isUrlOkForAccess(String check, Set<String> acUrls, boolean ignorePath) {
+	private static boolean isUrlOkForAccess(String check, Collection<? extends AcceptedUrl> acUrls, boolean ignorePath) {
 		if (check == null || acUrls == null) {
 			return false;
 		}
@@ -59,28 +60,38 @@ public class UrlAcceptor {
 		catch (URISyntaxException | NullPointerException ex) {
 			log.error("Invalid url=\"{}\" : {}", check, ex.toString());
 		}
-		return acUrls.stream().anyMatch(acuri -> isUrlOkForAccess(check, acuri, ignorePath));
-	}
-
-	public static boolean isRedirectUrlOkForAccess(String requestedRedirectUri, List<URI> acUrls) {
-		if (requestedRedirectUri != null || acUrls != null) {
-			var acUrlsSet = acUrls.stream().map(URI::toString).collect(Collectors.toSet());
-			return isRedirectUrlOkForAccess(requestedRedirectUri, acUrlsSet);
-		}
-		return false;
+		return acUrls.stream().anyMatch(acUri -> isUrlOkForAccess(check, acUri, ignorePath));
 	}
 
 	// Check URLs including localhost special semantics but accept regexp on path and /.* as not having a sub-path,
 	// so we do not have to configure https:/host/.* and https://host twice.
-	public static boolean isUrlOkForAccess(URI check, URI accept) {
+	// (variant with URI, URI not used at the moment)
+	public static boolean isUrlOkForAccess(URI check, AcceptedUrl accept) {
 		return isUrlOkForAccess(check, accept, false);
 	}
 
+	// same ignoring the path
+	// (variant with URI, AcceptedUrl not used at the moment)
 	public static boolean isUrlOkForAccessIgnoringPath(URI check, URI accept) {
-		return isUrlOkForAccess(check, accept, true);
+		return isUrlOkForAccess(check, accept, null, AcceptedUrlFormat.FULL, true);
 	}
 
-	private static boolean isUrlOkForAccess(URI check, URI accept, boolean ignorePath) {
+	private static boolean isUrlOkForAccess(URI check, AcceptedUrl accept, boolean ignorePath) {
+		if (accept == null || accept.getFormat() == AcceptedUrlFormat.IGNORED) {
+			return false;
+		}
+		// regex can be an invalid URL or URL parts are not properly assigned - ignorePath ignored as we cannot split the regex
+		if (accept.getFormat() == AcceptedUrlFormat.REGEX) {
+			return check.toString().matches(accept.getUrl());
+		}
+		if (accept.getUri() == null) {
+			log.warn("Missing URI for format={} AcUrl=\"{}\"", accept.getFormat(), accept.getUrl());
+		}
+		return isUrlOkForAccess(check, accept.getUri(), accept.getPattern(), accept.getFormat(), ignorePath);
+	}
+
+	private static boolean isUrlOkForAccess(URI check, URI accept, Pattern pattern, AcceptedUrlFormat format,
+			boolean ignorePath) {
 		if (check == null || accept == null) {
 			return false;
 		}
@@ -90,7 +101,7 @@ public class UrlAcceptor {
 						isSchemeMatching(check, accept) &&
 						isHostMatching(check, accept, isLocalHost) &&
 						isPortMatching(check, accept, isLocalHost) &&
-						(ignorePath || isPathMatching(check, accept));
+						(ignorePath || isPathMatching(check, accept, pattern, format));
 	}
 
 	// protocol must match exactly
@@ -113,15 +124,47 @@ public class UrlAcceptor {
 	}
 
 	// path must match by regexp including /.* or without it (top-level resource access allowed)
-	private static boolean isPathMatching(URI check, URI accept) {
-		return check.getPath().equals(accept.getPath())
-				|| (check.getPath() + SUBPATH_MATCH).equals(accept.getPath()) // handle exact match without a trailing /
-				|| check.getPath().matches(accept.getPath());
+	private static boolean isPathMatching(URI check, URI accept, Pattern pattern, AcceptedUrlFormat format) {
+		return switch (format) {
+			case FULL -> fullMatch(check.getPath(), accept.getPath());
+			case PREFIX -> prefixMatch(check.getPath(), accept.getPath());
+			case REGEX, IGNORED -> false; // handled before
+			case PATH_REGEX -> regexMatch(check.getPath(), accept.getPath(), pattern);
+			// legacy matching:
+			case ANY -> check.getPath().equals(accept.getPath())
+					|| (check.getPath() + SUBPATH_MATCH).equals(accept.getPath()) // handle exact match without a trailing /
+					|| check.getPath().matches(accept.getPath());
+		};
 	}
 
-	static boolean isUrlOkForAccess(String check, String accept, boolean ignorePath) {
+	private static boolean fullMatch(String check, String accept) {
+		return check.equals(accept);
+	}
+
+	private static boolean prefixMatch(String check, String accept) {
+		if (fullMatch(check, accept)) {
+			return true;
+		}
+		if (accept.endsWith("/")) {
+			return check.startsWith(accept) || (check + '/').startsWith(accept);
+		}
+		return check.startsWith(accept + '/');
+	}
+
+	private static boolean regexMatch(String check, String accept, Pattern pattern) {
+		if (pattern == null) {
+			if (accept == null) {
+				log.warn("Missing pattern and accept URL - cannot match url='{}'", check);
+				return false;
+			}
+			pattern = Pattern.compile(accept);
+		}
+		return pattern.matcher(check).matches();
+	}
+
+	static boolean isUrlOkForAccess(String check, AcceptedUrl accept, boolean ignorePath) {
 		try {
-			return isUrlOkForAccess(new URI(check), new URI(accept), ignorePath);
+			return isUrlOkForAccess(new URI(check), accept, ignorePath);
 		}
 		catch (URISyntaxException | NullPointerException e) {
 			log.error("Deny invalid url={} checked against acUrl={} ({})", check, accept, e.getMessage());
@@ -161,15 +204,24 @@ public class UrlAcceptor {
 		}
 	}
 
-	// accept http://localhost/.* as http://localhost too and also handle default ports
-	private static boolean localhostUrlOkForAccess(String check, String aclUri, boolean ignorePath) {
-		return check.matches(aclUri) // regexp match only
-				|| check.matches(aclUri.replace(SUBPATH_MATCH, "")) // regexp match but skip sub-path
-				|| isUrlOkForAccess(check, aclUri, ignorePath); // OIDC check aligned with SAML check
+	// format ANY accept http://localhost/.* as http://localhost too and also handle default ports
+	private static boolean localhostUrlOkForAccess(String check, AcceptedUrl aclUri, boolean ignorePath) {
+		if (aclUri.getFormat() == AcceptedUrlFormat.IGNORED) {
+			return false;
+		}
+		var match = switch (aclUri.getFormat()) {
+			case FULL, IGNORED -> false;
+			case REGEX, PATH_REGEX -> regexMatch(check, aclUri.getUrl(), aclUri.getPattern());
+			case PREFIX -> prefixMatch(check, aclUri.getUrl());
+			// legacy matching:
+			case ANY -> check.matches(aclUri.getUrl()) // regexp match only
+					|| check.matches(aclUri.getUrl().replace(SUBPATH_MATCH, "")); // regexp match but skip sub-path
+		};
+		return match || isUrlOkForAccess(check, aclUri, ignorePath); // OIDC check aligned with SAML check
 	}
 
-	// Use regex validation for localhost URLs of type https?://localhost:?(.*?)/?
-	private static boolean localhostUrlOkForAccess(String check, Set<String> aclUris, boolean ignorePath) {
+	// Use regex validation for localhost URLs of format https?://localhost:?(.*?)/?
+	private static boolean localhostUrlOkForAccess(String check, Collection<? extends AcceptedUrl> aclUris, boolean ignorePath) {
 		return check != null && aclUris != null &&
 				aclUris.stream().anyMatch(configUri -> localhostUrlOkForAccess(check, configUri, ignorePath));
 	}

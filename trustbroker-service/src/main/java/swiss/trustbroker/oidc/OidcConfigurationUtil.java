@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -43,11 +44,13 @@ import org.springframework.security.oauth2.server.authorization.settings.TokenSe
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.util.CollectionUtils;
 import swiss.trustbroker.api.sessioncache.dto.AttributeName;
+import swiss.trustbroker.common.dto.AcceptedUrl;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.AttributeRegistry;
 import swiss.trustbroker.common.saml.util.CoreAttributeName;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.UrlAcceptor;
+import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.xmlconfig.AuthorizationGrantType;
@@ -93,7 +96,9 @@ public class OidcConfigurationUtil {
 		// spring security OIDC registry entry
 		var clientSettings = getClientSettings(polices);
 		var tokenSettings = getTokenSettings(polices, defaultTokenTimeSec, defaultCodeTimeSec);
-		var redirectUrls = client.getRedirectUris() != null ? client.getRedirectUris().getRedirectUrls() : List.of("Missing redirectUrl for client");
+		var redirectUrls = client.getRedirectUris() != null ?
+				client.getRedirectUris().getRedirectUrls().stream().map(AcceptedUrl::getUrl).toList() :
+				List.of("Missing redirectUrl for client");
 
 		// construct it
 		var registeredClient = RegisteredClient.withId(clientId)
@@ -542,22 +547,23 @@ public class OidcConfigurationUtil {
 	}
 
 	static boolean isRedirectUrlValid(String redirectUrl, String clientId, String redirectUrlParameterName,
-			RelyingPartyDefinitions relyingPartyDefinitions, ClientConfigInMemoryRepository registeredClientRepository) {
+			RelyingPartyDefinitions relyingPartyDefinitions, TrustBrokerProperties trustBrokerProperties) {
 		var ok = false;
-		Set<String> configuredRedirectUrls = null;
+		List<AcceptedUrl> configuredRedirectUrls = null;
 
 		// Get XTB client configuration
 		// We use regexp matching on path here
+		Optional<OidcClient> client;
 		if (clientId == null) {
-			var client = relyingPartyDefinitions.getOidcClientByPredicate(cl -> cl.isValidRedirectUri(redirectUrl));
+			client = relyingPartyDefinitions.getOidcClientByPredicate(cl -> cl.isValidRedirectUri(redirectUrl));
 			clientId = client.map(OidcClient::getId).orElse(null);
 		}
-
-		// get spring-sec client information
-		var registeredClient = registeredClientRepository.findByClientId(clientId);
-		if (registeredClient != null) {
-			ok = UrlAcceptor.isRedirectUrlOkForAccess(redirectUrl, registeredClient.getRedirectUris());
-			configuredRedirectUrls = registeredClient.getRedirectUris();
+		else {
+			client = relyingPartyDefinitions.getOidcClientConfigById(clientId, trustBrokerProperties);
+		}
+		if (client.isPresent()) {
+			configuredRedirectUrls = client.get().getRedirectUris().getRedirectUrls();
+			ok = UrlAcceptor.isRedirectUrlOkForAccess(redirectUrl, configuredRedirectUrls);
 		}
 		if (ok) {
 			log.debug("{}={} for client_id={} is one of the allowed uris={}",

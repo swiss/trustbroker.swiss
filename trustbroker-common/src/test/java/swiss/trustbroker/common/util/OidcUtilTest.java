@@ -22,6 +22,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Collections;
@@ -36,6 +37,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import swiss.trustbroker.common.dto.AcceptedUrl;
+import swiss.trustbroker.common.dto.AcceptedUrlFormat;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.Base64Util;
@@ -68,16 +71,28 @@ class OidcUtilTest {
 			"https://host3:443/any,true",
 			"https://host3/any/subpath,true",
 			"https://host4/any,true",
-			"https://host4:443/any,true"
+			"https://host4:443/any,true",
+			"https://host5/path/any.html,true",
+			"https://host5:443/other/index.html,true"
 	})
 	void testRedirectUriMatch(String url, boolean expectedResult) {
-		var config = Set.of(
-				"https://host1/path/subpath",
-				"https://host2/path/.*",
-				"https://host3/.*",
-				"https://host4:443/.*"
+		Set<AcceptedUrl> config = Set.of(
+				TestAcUrl.of("https://host1/path/subpath", AcceptedUrlFormat.FULL),
+				TestAcUrl.of("https://host2/path/", AcceptedUrlFormat.PREFIX),
+				TestAcUrl.of("https://host3/", AcceptedUrlFormat.PREFIX),
+				TestAcUrl.of("https://host4(:443)?(/.*)?", AcceptedUrlFormat.REGEX),
+				TestAcUrl.of("https://host5/.*.html", AcceptedUrlFormat.PATH_REGEX)
 		);
 		assertThat(UrlAcceptor.isRedirectUrlOkForAccess(url, config), is(expectedResult));
+		// backward compatibility check with type ANY:
+		Set<AcceptedUrl> configCompat = Set.of(
+				TestAcUrl.of("https://host1/path/subpath", AcceptedUrlFormat.ANY),
+				TestAcUrl.of("https://host2/path/.*", AcceptedUrlFormat.ANY),
+				TestAcUrl.of("https://host3/.*", AcceptedUrlFormat.ANY),
+				TestAcUrl.of("https://host4:443/.*", AcceptedUrlFormat.ANY),
+				TestAcUrl.of("https://host5:443/.*.html", AcceptedUrlFormat.ANY)
+		);
+		assertThat(UrlAcceptor.isRedirectUrlOkForAccess(url, configCompat), is(expectedResult));
 	}
 
 	@Test
@@ -223,7 +238,9 @@ class OidcUtilTest {
 				  "sub": "user1"
 				}""";
 		var token = Base64Util.urlEncode(tokenHeader) + '.' + Base64Util.urlEncode(tokenPayload) + '.';
-		assertThrows(RequestDeniedException.class, () -> OidcUtil.verifyJwtToken(token, kid -> Optional.empty(), "clientId"));
+		assertThrows(RequestDeniedException.class, () ->
+				OidcUtil.verifyJwtToken(token, kid -> Optional.empty(), "clientId",true));
+		assertDoesNotThrow(() -> OidcUtil.verifyJwtToken(token, kid -> Optional.empty(), "clientId", false));
 	}
 
 	@ParameterizedTest

@@ -1,5 +1,6 @@
 plugins {
 	id 'java-library'
+	id 'jacoco'
 }
 
 configurations {
@@ -20,6 +21,31 @@ dependencies {
 
 	// test
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+}
+
+publishing {
+	publications {
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
+	}
+}
+
+artifactoryPublish {
+	publications(publishing.publications.docJar)
+}
+
+publishing {
+	publications {
+		docJar(MavenPublication) {
+			artifact tasks.named('javadocjar')
+		}
+	}
+}
+
+artifactoryPublish {
+	publications(publishing.publications.docJar)
 }
 
 publishing {

@@ -49,7 +49,13 @@ public enum StatusPolicy {
 	/**
 	 * Proceed anyway.
 	 */
-	ALLOW_UNKNOWN_USER;
+	ALLOW_UNKNOWN_USER,
+	/**
+	 * Stop processing further IDM queries once a user has been found.
+	 *
+	 * @since 1.16.0
+	 */
+	STOP_ON_USER_FOUND;
 
 	public static StatusPolicy of(String name) {
 		return EnumUtils.getEnum(StatusPolicy.class, name);

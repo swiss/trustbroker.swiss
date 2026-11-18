@@ -47,6 +47,18 @@ public class ProfileSelectionConfig {
 	private boolean enabled;
 
 	/**
+	 * Defines the default profile selection service type when no explicit type is provided.
+	 * <br/>
+	 * Default: default
+	 * This value selects the <code>NoOpProfileSelectionService</code> which is only available if no other instances of
+	 * <code>ProfileSelectionService</code> are enabled. If more than one <code>ProfileSelectionService</code> is enabled,
+	 * either set this property to one of them or always set store on all <code>IdmLookup</code> .
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private String defaultService = "default";
+
+	/**
 	 * Custom attributes that might be needed by the implementation.
  	 */
 	private Map<String, Object> attributes;

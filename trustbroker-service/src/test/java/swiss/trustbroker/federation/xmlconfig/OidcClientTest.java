@@ -32,7 +32,7 @@ class OidcClientTest {
 	void isTrustedOrigin(List<String> acUrls, String origin, boolean expected) {
 		var acWhitelist = acUrls == null ? null :
 				AcWhitelist.builder()
-						   .acUrls(acUrls)
+						   .acUrls(AcUrl.asAcUrlList(acUrls))
 						   .build();
 		var oidcClient = OidcClient.builder()
 								   .redirectUris(acWhitelist)

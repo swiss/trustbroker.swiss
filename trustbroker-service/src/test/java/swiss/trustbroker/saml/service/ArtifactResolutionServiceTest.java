@@ -149,7 +149,8 @@ class ArtifactResolutionServiceTest {
 		security.setRequireSignedArtifactResolve(false);
 		security.setRequireSignedArtifactResponse(false);
 		doReturn(security).when(trustBrokerProperties).getSecurity();
-		doReturn(new SamlProperties()).when(trustBrokerProperties).getSaml();
+		var samlProperties = SamlProperties.builder().enabled(true).build();
+		doReturn(samlProperties).when(trustBrokerProperties).getSaml();
 		doReturn(new OidcProperties()).when(trustBrokerProperties).getOidc();
 	}
 
@@ -242,6 +243,7 @@ class ArtifactResolutionServiceTest {
 
 	private static Saml buildSaml() {
 		return Saml.builder()
+				.enabled(true)
 				.protocolEndpoints(
 						ProtocolEndpoints.builder()
 								.artifactResolutionIndex(AR_INDEX)
@@ -276,8 +278,8 @@ class ArtifactResolutionServiceTest {
 			assertThat(request.getUri().toString(), is(AR_SERVICE_URL));
 			assertThat(request, instanceOf(HttpPost.class));
 			var postRequest = (HttpPost) request;
-			var artifactResolve =
-					SoapUtil.extractSamlObjectFromEnvelope(postRequest.getEntity().getContent(), ArtifactResolve.class);
+			var envelope = SoapUtil.readEnvelope(postRequest.getEntity().getContent());
+			var artifactResolve = SoapUtil.extractSamlObjectFromEnvelope(envelope, ArtifactResolve.class);
 			assertThat(artifactResolve.getArtifact().getValue(), is(artifactIdEncoded));
 			assertThat(artifactResolve.isSigned(), is(true));
 			assertThat(SamlUtil.isSignatureValid(
@@ -322,8 +324,8 @@ class ArtifactResolutionServiceTest {
 		artifactResolutionService.resolveArtifact(request, response);
 
 		// check
-		var artifactResponse = SoapUtil.extractSamlObjectFromEnvelope(
-				new ByteArrayInputStream(response.getContentAsByteArray()), ArtifactResponse.class);
+		var envelope = SoapUtil.readEnvelope(new ByteArrayInputStream(response.getContentAsByteArray()));
+		var artifactResponse = SoapUtil.extractSamlObjectFromEnvelope(envelope, ArtifactResponse.class);
 
 		assertThat(artifactResponse.getStatus().getStatusCode().getValue(), is(StatusCode.SUCCESS));
 		validateArtifactResponse(artifactResponse, RP_ISSUER_ID);
@@ -351,8 +353,8 @@ class ArtifactResolutionServiceTest {
 		artifactResolutionService.resolveArtifact(request, response);
 
 		// check
-		var artifactResponse = SoapUtil.extractSamlObjectFromEnvelope(
-				new ByteArrayInputStream(response.getContentAsByteArray()), ArtifactResponse.class);
+		var envelope = SoapUtil.readEnvelope(new ByteArrayInputStream(response.getContentAsByteArray()));
+		var artifactResponse = SoapUtil.extractSamlObjectFromEnvelope(envelope, ArtifactResponse.class);
 
 		assertThat(artifactResponse.getStatus().getStatusCode().getValue(), is(StatusCode.SUCCESS));
 		validateArtifactResponse(artifactResponse, CP_ISSUER_ID);
@@ -377,8 +379,8 @@ class ArtifactResolutionServiceTest {
 		artifactResolutionService.resolveArtifact(request, response);
 
 		// check
-		var artifactResponse = SoapUtil.extractSamlObjectFromEnvelope(
-				new ByteArrayInputStream(response.getContentAsByteArray()), ArtifactResponse.class);
+		var envelope = SoapUtil.readEnvelope(new ByteArrayInputStream(response.getContentAsByteArray()));
+		var artifactResponse = SoapUtil.extractSamlObjectFromEnvelope(envelope, ArtifactResponse.class);
 
 		assertThat(artifactResponse.getStatus().getStatusCode().getValue(), is(StatusCode.RESOURCE_NOT_RECOGNIZED));
 		validateArtifactResponse(artifactResponse, RP_ISSUER_ID);
@@ -406,6 +408,7 @@ class ArtifactResolutionServiceTest {
 		ar.setKeystore(keystore);
 		trustBrokerProperties.getSecurity().setDoSignArtifactResolve(true);
 		var samlProperties = new SamlProperties();
+		samlProperties.setEnabled(true);
 		samlProperties.setArtifactResolution(ar);
 		doReturn(samlProperties).when(trustBrokerProperties).getSaml();
 		doReturn(AR_ENTITY_ID).when(trustBrokerProperties).getIssuer();

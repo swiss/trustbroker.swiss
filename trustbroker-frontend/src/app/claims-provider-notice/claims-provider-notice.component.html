@@ -23,7 +23,11 @@
 
 	<div>
 		@for (paragraph of paragraphs$ | async; track paragraph) {
-			<p class="body1" [innerHTML]="paragraph | safeMarkup"></p>
+			@if (paragraph.startsWith("<") && paragraph.endsWith(">")) {
+				<div [innerHTML]="paragraph | safeMarkup"></div>
+			} @else {
+				<p class="body1">{{ paragraph }}</p>
+			}
 		}
 	</div>
 
@@ -31,7 +35,7 @@
 		<div [class]="`idp-section ${idp.name.toLowerCase()}`" [class.primary]="$first">
 			@let paragraphKey = `${i18nPrefix}.${idpObject.name}.providers.${idp.name}.paragraph` | lowercase;
 			@if (paragraphKey | hasTranslation | async) {
-				<p>{{ paragraphKey | translate }}</p>
+				<p [innerHTML]="paragraphKey | translate"></p>
 			}
 			<div class="buttons">
 				@let iconKey = `${i18nPrefix}.${idpObject.name}.providers.${idp.name}.icon` | lowercase;
@@ -39,8 +43,13 @@
 					<img [src]="`${apiBaseUrl}ui/assets/images/xtb-default/${(iconKey | translate)}`" class="secondary-image" alt="" />
 				}
 				<button mat-button [obButton]="isPrimary ? 'primary' : 'secondary'" type="button" (click)="selectIdp(idp)">
-					@let idpTitle = "trustbroker.hrd.cards." + idp.name + ".title" | translate: { Default: idp.title };
-					{{ "trustbroker.hrd.notice.continueWith.button" | translate: { name: idpTitle } }}
+					@let buttonTextKext = `${i18nPrefix}.${idpObject.name}.providers.${idp.name}.button` | lowercase;
+					@if (buttonTextKext | hasTranslation | async) {
+						{{ buttonTextKext | translate }}
+					} @else {
+						@let idpTitle = "trustbroker.hrd.cards." + idp.name + ".title" | translate: { Default: idp.title };
+						{{ "trustbroker.hrd.notice.continueWith.button" | translate: { name: idpTitle } }}
+					}
 				</button>
 			</div>
 		</div>

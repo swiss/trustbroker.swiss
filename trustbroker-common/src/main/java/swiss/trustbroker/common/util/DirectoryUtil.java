@@ -171,13 +171,27 @@ public class DirectoryUtil {
 		return url != null;
 	}
 
-
-	// configs may only contain the path relative to a directory
+	/**
+	 * Configs may only contain the path relative to a directory, but for some cases we need to resolve the absolute path.
+	 * @param basePath base path to resolve the file path against (can be null)
+	 * @param filePath file path to resolve (must not be null)
+	 * @return This method resolves the absolute path of a file based on a base path unless the file path is already absolute.
+	 */
 	public static File absoluteFile(String basePath, String filePath) {
 		var result = new File(filePath);
-		if (result.isAbsolute()) {
+		if (basePath == null) {
+			log.debug("filePath={} is used as-is, no basePath provided", filePath);
 			return result;
 		}
+		if (result.isAbsolute()) {
+			log.debug("Absolute filePath={} is used as-is, ignoring basePath={}", filePath, basePath);
+			return result;
+		}
+		if (filePath.startsWith(basePath)) {
+			log.debug("filePath={} starts with basePath={}, using as-is", filePath, basePath);
+			return new File(filePath);
+		}
+		log.debug("Using filePath={} relative to basePath={}", filePath, basePath);
 		return new File(basePath, filePath);
 	}
 }

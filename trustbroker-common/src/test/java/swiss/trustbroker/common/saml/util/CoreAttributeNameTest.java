@@ -33,7 +33,7 @@ class CoreAttributeNameTest {
 
 	private static final int ALL_NAMES_COUNT = CoreAttributeName.values().length;
 
-	private static final int NO_FQ_NAME = 6;
+	private static final int NO_FQ_NAME = 7;
 
 	private static final int ALL_FQ_NAMES_COUNT = ALL_NAMES_COUNT - NO_FQ_NAME;
 

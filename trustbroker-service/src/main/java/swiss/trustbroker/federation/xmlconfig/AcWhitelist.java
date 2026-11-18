@@ -16,13 +16,13 @@
 package swiss.trustbroker.federation.xmlconfig;
 
 import java.io.Serializable;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
@@ -34,6 +34,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
+import swiss.trustbroker.common.dto.AcceptedUrl;
+import swiss.trustbroker.common.dto.AcceptedUrlFormat;
 import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.common.util.WebUtil;
 
@@ -64,19 +66,16 @@ public class AcWhitelist implements Serializable {
 	 * List of allowed URLs.
 	 */
 	@XmlElement(name = "ACUrl")
-	private List<String> acUrls;
+	private List<AcUrl> acUrls;
 
 	@XmlTransient
-	private List<URI> acNetUrls;
-
-	@XmlTransient
-	private List<String> redirectUrls;
+	private List<AcceptedUrl> redirectUrls;
 
 	@XmlTransient
 	private List<String> origins;
 
 	@XmlTransient
-	private Set<String> originSet;
+	private Set<AcceptedUrl> originSet;
 
 	/**
 	 * Allowed frame ancestors for iframes.
@@ -89,18 +88,17 @@ public class AcWhitelist implements Serializable {
 	private List<String> frameAncestors;
 
 	public AcWhitelist() {
-		this(null, null, null, null, null, null, null);
+		this(null, null, null, null, null, null);
 	}
 
-	public AcWhitelist(List<String> acUrls) {
-		this(null, acUrls, null, null, null, null,null);
+	public AcWhitelist(List<AcUrl> acUrls) {
+		this(null, acUrls, null, null, null, null);
 	}
 
-	public AcWhitelist(Boolean useDefault, List<String> acUrls, List<URI> acNetUrls, List<String> redirectUrls,
-			List<String> origins, Set<String> originSet,
+	public AcWhitelist(Boolean useDefault, List<AcUrl> acUrls, List<AcceptedUrl> redirectUrls,
+			List<String> origins, Set<AcceptedUrl> originSet,
 			List<String> frameAncestors) {
 		this.useDefault = useDefault;
-		this.acNetUrls = acNetUrls;
 		this.origins = origins;
 		this.originSet = originSet;
 		this.redirectUrls = redirectUrls;
@@ -108,41 +106,65 @@ public class AcWhitelist implements Serializable {
 		this.frameAncestors = frameAncestors;
 	}
 
-	public void setAcUrls(List<String> acUrls) {
-		this.acUrls = acUrls == null ? new ArrayList<>() : acUrls;
-		calculateDerivedUrls();
+	public void setAcUrls(List<AcUrl> acUrls) {
+		this.acUrls = acUrls;
+		calculateDerivedUrls(Optional.empty());
 	}
 
-	public void calculateDerivedUrls() {
-		this.acUrls = acUrls == null ? new ArrayList<>() : acUrls;
-		this.redirectUrls = new ArrayList<>();
-		this.acNetUrls = new ArrayList<>();
-		this.origins = new ArrayList<>();
-		for (var acUrl : this.acUrls) {
-			var url = WebUtil.getValidatedUri(acUrl);
-			if (url == null || !url.isAbsolute()) {
-				log.info("Ignoring ACUrl={} - it is invalid, relative or a regex", acUrl);
+	// default format is null, the caller must apply the @Default of AcUrl later
+	public void calculateDerivedUrls(Optional<Consumer<String>> errorCallback) {
+		calculateDerivedUrls(null, errorCallback);
+	}
+
+	public void calculateDerivedUrls(AcceptedUrlFormat defaultFormat, Optional<Consumer<String>> errorCallback) {
+		if (acUrls == null) {
+			acUrls = new ArrayList<>();
+		}
+		redirectUrls = new ArrayList<>();
+		origins = new ArrayList<>();
+		originSet = new HashSet<>();
+		for (var acUrl : acUrls) {
+			calculateDerivedUrl(acUrl, defaultFormat, errorCallback);
+		}
+	}
+
+	private void calculateDerivedUrl(AcUrl acUrl, AcceptedUrlFormat defaultFormat, Optional<Consumer<String>> errorCallback) {
+		var url = WebUtil.getValidatedUri(acUrl.getUrl());
+		acUrl.setUri(url); // URI needed in case acUrl is used for validation
+		if (url == null || !url.isAbsolute()) {
+			if (acUrl.getFormat() == AcceptedUrlFormat.REGEX) {
+				log.info("ACUrl={} - is invalid or relative URL - accepted for REGEX", acUrl);
 			}
 			else {
-				this.acNetUrls.add(url);
-				var validOrigin = WebUtil.getValidOrigin(url);
-				if (validOrigin == null) {
-					// happens e.g. with wildcards in domain names
-					log.info("Ignoring url={} having scheme='{}' host='{}' authority='{}' (HINT: No regexp on these fields)",
-							url, url.getScheme(), url.getHost(), url.getAuthority());
-				}
-				else {
-					this.origins.add(validOrigin);
-				}
-				if (url.getRawFragment() == null) {
-					this.redirectUrls.add(acUrl);
-				}
-				else {
-					log.info("ACUrl={} contains a fragment - not a valid redirect URL", acUrl);
-				}
+				var msg = String.format("Ignoring ACUrl=%s - it is invalid, relative or a regex without regex format", acUrl);
+				log.info(msg);
+				acUrl.setFormat(AcceptedUrlFormat.IGNORED);
+				errorCallback.ifPresent(consumer -> consumer.accept(msg));
 			}
 		}
-		this.originSet = new HashSet<>(this.origins);
+		else {
+			var validOrigin = WebUtil.getValidOrigin(url);
+			if (validOrigin == null) {
+				// happens e.g. with wildcards in domain names
+				log.info("Ignoring url={} having scheme='{}' host='{}' authority='{}' (HINT: No regexp on these fields)",
+						url, url.getScheme(), url.getHost(), url.getAuthority());
+			}
+			else {
+				this.origins.add(validOrigin);
+				this.originSet.add(AcUrl.of(validOrigin));
+			}
+			if (url.getRawFragment() == null) {
+				this.redirectUrls.add(acUrl);
+			}
+			else {
+				log.info("ACUrl={} contains a fragment - not a valid redirect URL", acUrl);
+			}
+		}
+		if (acUrl.getFormat() == null) {
+			acUrl.setFormat(defaultFormat);
+			log.trace("ACUrl={} without format, set default format", acUrl);
+		}
+		acUrl.derivePattern(errorCallback);
 	}
 
 	public List<String> getFrameAncestorsWithFallback() {
@@ -156,11 +178,12 @@ public class AcWhitelist implements Serializable {
 		if (!Boolean.TRUE.equals(useDefault) || CollectionUtils.isEmpty(acUrls)) {
 			return Optional.empty();
 		}
-		return Optional.of(acUrls.getFirst());
+		return Optional.of(acUrls.getFirst().getUrl());
 	}
 
 	public Optional<String> findFirst(BiPredicate<String, String> matcher, String checkUrl) {
-		return CollectionUtil.findSingleValueByPredicate(acUrls, acUrl -> matcher.test(acUrl, checkUrl));
+		return CollectionUtil.findSingleValueByPredicate(acUrls, acUrl -> matcher.test(acUrl.getUrl(), checkUrl))
+							 .map(AcUrl::getUrl);
 	}
 
 	public Optional<String> findEqualWithDefault(String checkUrl) {

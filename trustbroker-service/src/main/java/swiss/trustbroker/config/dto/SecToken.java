@@ -30,6 +30,15 @@ import lombok.NoArgsConstructor;
 public class SecToken {
 
 	/**
+	 * Use security token for authentication.
+	 * <br/>
+	 * Default: true
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private boolean enabled = true;
+
+	/**
 	 * Security token lifetime in seconds.
 	 */
 	private Integer lifetimeSec;

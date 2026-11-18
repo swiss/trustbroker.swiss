@@ -10,8 +10,6 @@ ext {
 	// build promotion
 	buildName = System.env.BUILD_NAME
 	buildNumber = System.env.BUILD_NUMBER
-	repoUser = 'anonymous'
-	repoPass = 'anonymous'
 }
 
 dependencyResolutionManagement {
@@ -39,5 +37,6 @@ include 'trustbroker-samlmock'
 include 'trustbroker-oidcmock'
 include 'trustbroker-docs'
 include 'trustbroker-store-ldap'
+include 'trustbroker-store-rest'
 // plus 'trustbroker-install'
 

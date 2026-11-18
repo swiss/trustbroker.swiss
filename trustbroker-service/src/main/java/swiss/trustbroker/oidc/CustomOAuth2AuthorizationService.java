@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import javax.annotation.Nullable;
 
 import jakarta.persistence.OptimisticLockException;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,6 @@ import org.springframework.jdbc.core.ArgumentPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.SqlParameterValue;
-import org.jspecify.annotations.Nullable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;

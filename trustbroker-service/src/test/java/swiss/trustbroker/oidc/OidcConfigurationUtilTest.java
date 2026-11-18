@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,16 +35,17 @@ import static org.mockito.Mockito.when;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -56,11 +58,17 @@ import org.springframework.security.oauth2.server.authorization.oidc.OidcProvide
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.OAuth2TokenFormat;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import swiss.trustbroker.common.dto.AcceptedUrl;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.CoreAttributeInitializer;
 import swiss.trustbroker.common.saml.util.CoreAttributeName;
+import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.WebUtil;
+import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.OidcProperties;
+import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.AuthorizationGrantType;
 import swiss.trustbroker.federation.xmlconfig.AuthorizationGrantTypes;
@@ -76,6 +84,10 @@ import swiss.trustbroker.oidc.session.OidcSessionSupport;
 
 @SpringBootTest(classes = OidcConfigurationUtilTest.class)
 class OidcConfigurationUtilTest {
+
+	private static final String REDIRECT_URL = "https://localhost/test";
+
+	private static final String CLIENT_ID = "client1";
 
 	private static final List<String> ROLES = List.of("APP1.ALLOW", "APP2.ALLOW", "APP2.ROLE1");
 
@@ -99,9 +111,19 @@ class OidcConfigurationUtilTest {
 
 	private static final int AUTHORIZATION_CODE_TIME_TO_LIVE_MIN = DEFAULT_CODE_TIME_SECS / 60;
 
+	@MockitoBean
+	private RelyingPartyDefinitions relyingPartyDefinitions;
+
+	private TrustBrokerProperties trustBrokerProperties;
+
 	@BeforeAll
-	static void setup() {
+	static void setUpClass() {
 		new CoreAttributeInitializer().init();
+	}
+
+	@BeforeEach
+	void setUp() {
+		trustBrokerProperties = new TrustBrokerProperties();
 	}
 
 	@Test
@@ -408,7 +430,7 @@ class OidcConfigurationUtilTest {
 		assertThat(result.getClientAuthenticationMethods(), containsInAnyOrder(authMethodsArray));
 		assertThat(result.getAuthorizationGrantTypes(), containsInAnyOrder(grantTypesArray));
 		assertThat(result.getScopes(), containsInAnyOrder(scopesArray));
-		var redirectUris = oidcClient.getRedirectUris().getRedirectUrls().toArray(Object[]::new);
+		var redirectUris = oidcClient.getRedirectUris().getRedirectUrls().stream().map(AcceptedUrl::getUrl).toArray(Object[]::new);
 		assertThat(result.getRedirectUris(), containsInAnyOrder(redirectUris));
 		assertThat(result.getTokenSettings(), is(givenTokenSettings()));
 	}
@@ -447,12 +469,62 @@ class OidcConfigurationUtilTest {
 		verify(builder).claim("test", claimValue);
 	}
 
+	@Test
+	void isRedirectUrlValidResolvesClientByRedirectUrlWhenClientIdIsMissing() {
+		var client = givenOidcClientWithRedirectUrl(REDIRECT_URL);
+		when(relyingPartyDefinitions.getOidcClientByPredicate(argThat(predicate -> predicate.test(client))))
+				.thenReturn(Optional.of(client));
+
+		var result = OidcConfigurationUtil.isRedirectUrlValid(
+				REDIRECT_URL, null, OidcUtil.REDIRECT_URI, relyingPartyDefinitions, trustBrokerProperties);
+
+		assertTrue(result);
+		verify(relyingPartyDefinitions, never()).getOidcClientConfigById(any(), any());
+	}
+
+	@Test
+	void isRedirectUrlValidReturnsFalseWhenConfiguredClientRejectsRedirectUrl() {
+		var requestRedirectUrl = "https://localhost/other";
+		var client = givenOidcClientWithRedirectUrl(REDIRECT_URL);
+		when(relyingPartyDefinitions.getOidcClientConfigById(CLIENT_ID, trustBrokerProperties)).thenReturn(Optional.of(client));
+
+		var result = OidcConfigurationUtil.isRedirectUrlValid(
+				requestRedirectUrl, CLIENT_ID, OidcUtil.REDIRECT_URI, relyingPartyDefinitions, trustBrokerProperties);
+
+		assertFalse(result);
+		verify(relyingPartyDefinitions, never()).getOidcClientByPredicate(any());
+	}
+
+	@Test
+	void isRedirectUrlValidReturnsFalseWhenNoClientConfigurationMatches() {
+		when(relyingPartyDefinitions.getOidcClientByPredicate(any())).thenReturn(Optional.empty());
+
+		var result = OidcConfigurationUtil.isRedirectUrlValid(
+				REDIRECT_URL, null, OidcUtil.REDIRECT_URI, relyingPartyDefinitions, trustBrokerProperties);
+
+		assertFalse(result);
+		verify(relyingPartyDefinitions, never()).getOidcClientConfigById(any(), any());
+	}
+
+	@Test
+	void isRedirectUrlValidReturnsFalseWhenClientIdIsProvidedButConfigurationIsMissing() {
+		var clientId = "missing-client";
+		when(relyingPartyDefinitions.getOidcClientConfigById(clientId, trustBrokerProperties)).thenReturn(Optional.empty());
+
+		var result = OidcConfigurationUtil.isRedirectUrlValid(
+				REDIRECT_URL, clientId, OidcUtil.REDIRECT_URI, relyingPartyDefinitions, trustBrokerProperties);
+
+		assertFalse(result);
+		verify(relyingPartyDefinitions).getOidcClientConfigById(clientId, trustBrokerProperties);
+		verify(relyingPartyDefinitions, never()).getOidcClientByPredicate(any());
+	}
+
 	private static OidcClient givenOidcClient(boolean withDefaults) {
 		var builder = OidcClient.builder()
-				.id("client1")
+				.id(CLIENT_ID)
 				.clientSecret("secret1")
 				.redirectUris(AcWhitelist.builder()
-						.acUrls(List.of("https://localhost/test"))
+						.acUrls(List.of(AcUrl.of(REDIRECT_URL)))
 						.build())
 				.oidcSecurityPolicies(OidcSecurityPolicies.builder()
 						.requireProofKey(true)
@@ -476,6 +548,15 @@ class OidcConfigurationUtilTest {
 		return builder.build();
 	}
 
+	private static OidcClient givenOidcClientWithRedirectUrl(String redirectUrl) {
+		return OidcClient.builder()
+				.id(CLIENT_ID)
+				.redirectUris(AcWhitelist.builder()
+						.acUrls(List.of(AcUrl.of(redirectUrl)))
+						.build())
+				.build();
+	}
+
 	private static ClientSettings givenClientSettings() {
 		return ClientSettings.builder()
 				.requireProofKey(true)
@@ -496,10 +577,10 @@ class OidcConfigurationUtilTest {
 
 	private Map<String, List<Object>> givenAttributesWithDuplicates() {
 		var map = new HashMap<String, List<Object>>();
-		map.put(CoreAttributeName.EMAIL.getNamespaceUri(), new ArrayList<>(Arrays.asList("email1", "email2")));
-		map.put(CoreAttributeName.CLAIMS_NAME.getNamespaceUri(), new ArrayList<>(Arrays.asList("claim", "claim")));
-		map.put(CoreAttributeName.NAME.getNamespaceUri(), new ArrayList<>(Arrays.asList("name", "name")));
-		map.put(CoreAttributeName.FIRST_NAME.getNamespaceUri(), new ArrayList<>(Arrays.asList("1", "2")));
+		map.put(CoreAttributeName.EMAIL.getNamespaceUri(), new ArrayList<>(List.of("email1", "email2")));
+		map.put(CoreAttributeName.CLAIMS_NAME.getNamespaceUri(), new ArrayList<>(List.of("claim", "claim")));
+		map.put(CoreAttributeName.NAME.getNamespaceUri(), new ArrayList<>(List.of("name", "name")));
+		map.put(CoreAttributeName.FIRST_NAME.getNamespaceUri(), new ArrayList<>(List.of("1", "2")));
 		return map;
 	}
 
@@ -527,6 +608,7 @@ class OidcConfigurationUtilTest {
 	private static OidcProperties givenOidcProperties(boolean introspectionEnabled, boolean revocationEnabled,
 			boolean userinfoEnabled) {
 		var properties = new OidcProperties();
+		properties.setEnabled(true);
 		properties.setIssuer("http://localhost/");
 		properties.setIntrospectionEnabled(introspectionEnabled);
 		properties.setRevocationEnabled(revocationEnabled);

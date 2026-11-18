@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import jakarta.servlet.http.Cookie;
 import org.apache.xml.security.utils.EncryptionConstants;
@@ -80,6 +81,7 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.util.HtmlUtils;
 import swiss.trustbroker.api.accessrequest.dto.AccessRequestHttpData;
 import swiss.trustbroker.api.accessrequest.dto.AccessRequestResult;
 import swiss.trustbroker.api.accessrequest.service.AccessRequestService;
@@ -281,7 +283,8 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 	@BeforeEach
 	void setupMocks() {
 		doReturn(CustomQoa.UNDEFINED_QOA).when(qoaService).getUnspecifiedAuthLevel();
-		doReturn(new SamlProperties()).when(trustBrokerProperties).getSaml();
+		var samlProperties = SamlProperties.builder().enabled(true).build();
+		doReturn(samlProperties).when(trustBrokerProperties).getSaml();
 		var sso = new SsoConfig();
 		sso.setEnabled(true);
 		doReturn(sso).when(trustBrokerProperties).getSso();
@@ -1303,8 +1306,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var samlResponseField = "name=\"" + SamlIoUtil.SAML_RESPONSE_NAME + '"';
 		assertThat(responseContent, containsString(samlResponseField));
 		assertThat(responseContent, containsString("value=\"" + RELAY_STATE + '"'));
-		var encodedResponse = responseContent.replace("\n", "").replaceAll("^.*" + samlResponseField + " value=\"",
-				"").replaceAll("\".*$", "");
+		var encodedResponse = extractInputValue(responseContent, SamlIoUtil.SAML_RESPONSE_NAME);
 		var request = new MockHttpServletRequest();
 		request.setMethod("POST");
 		request.setParameter(SamlIoUtil.SAML_RESPONSE_NAME, encodedResponse);
@@ -1320,6 +1322,14 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		assertThat(response.getCookies()[0].getValue(), is(""));
 	}
 
+	private static String extractInputValue(String html, String fieldName) {
+		var inputPattern = Pattern.compile("<input\\s+[^>]*name=\"" + Pattern.quote(fieldName)
+				+ "\"[^>]*value=\"([^\"]*)\"[^>]*/?>", Pattern.CASE_INSENSITIVE);
+		var matcher = inputPattern.matcher(html.replace("\n", "").replace("\r", ""));
+		assertTrue(matcher.find(), "Missing field in response HTML: " + fieldName);
+		return HtmlUtils.htmlUnescape(matcher.group(1));
+	}
+
 	private LogoutRequest setupLogoutRequestMockData(
 			MockHttpServletRequest request, boolean statePresent, ArtifactBindingMode mode) {
 		// matching RPs
@@ -1330,8 +1340,12 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		var sso2 = buildSso(ssoGroup2);
 		// for invalid binding test:
 		var artifactBinding = ArtifactBinding.builder().inboundMode(mode).build();
-		var saml = Saml.builder().artifactBinding(artifactBinding).build();
-		var secPol = SecurityPolicies.builder().requireSignedLogoutRequest(false).requireSignedResponse(false).build();
+		var saml = Saml.builder().enabled(true).artifactBinding(artifactBinding).build();
+		var secPol = SecurityPolicies.builder()
+				.requireSignedLogoutRequest(false)
+				.requireSignedResponse(false)
+				.requireLogoutRequestDestination(false)
+				.build();
 		var relyingParties = new ArrayList<RelyingParty>();
 		var relyingPartySso = RelyingParty.builder().id("X-ENTERPRISE").sso(sso).saml(saml).securityPolicies(secPol).build();
 		relyingParties.add(relyingPartySso);
@@ -1370,7 +1384,7 @@ class RelyingPartyServiceTest extends ServiceTestBase {
 		logoutRequest.setNameID(nameId);
 
 		var notification = new SloNotification(new SloResponse());
-		notification.setEncodedUrl(SLO_URL);
+		notification.setUrl(SLO_URL);
 		doReturn(new SecurityChecks()).when(trustBrokerProperties).getSecurity();
 
 		doReturn(new SloResponseParameters(Collections.emptyMap(), false, null))

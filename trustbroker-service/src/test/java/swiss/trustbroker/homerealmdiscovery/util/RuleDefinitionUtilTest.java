@@ -62,6 +62,7 @@ import swiss.trustbroker.api.sessioncache.dto.CpResponseData;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.config.TestConstants;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.AttributesSelection;
 import swiss.trustbroker.federation.xmlconfig.Certificates;
@@ -295,8 +296,8 @@ class RuleDefinitionUtilTest {
 	}
 
 	private RelyingParty givenRuleWithAcWhiteList() {
-		List<String> urls = new ArrayList<>();
-		urls.add("http://URL1");
+		List<AcUrl> urls = new ArrayList<>();
+		urls.add(AcUrl.of("http://URL1"));
 
 		AcWhitelist acWhitelist = new AcWhitelist();
 		acWhitelist.setAcUrls(urls);
@@ -932,7 +933,7 @@ class RuleDefinitionUtilTest {
 	}
 
 	private Oidc givenOidcClient(List<String> acUrls) {
-		var redirectUris = AcWhitelist.builder().acUrls(acUrls).build();
+		var redirectUris = AcWhitelist.builder().acUrls(AcUrl.asAcUrlList(acUrls)).build();
 		var clients = List.of(OidcClient.builder().id("clientId").redirectUris(redirectUris).build());
 		return Oidc.builder().clients(clients).build();
 	}
@@ -994,11 +995,11 @@ class RuleDefinitionUtilTest {
 	}
 
 	private AcWhitelist givenAcWhitelist() {
-		List<String> acUrls = new ArrayList<>();
-		acUrls.add("http://testURl1");
-		acUrls.add("http://testUrl2");
+		List<AcUrl> acUrls = new ArrayList<>();
+		acUrls.add(AcUrl.of("http://testURl1"));
+		acUrls.add(AcUrl.of("http://testUrl2"));
 
-		AcWhitelist acWhitelist = new AcWhitelist();
+		var acWhitelist = new AcWhitelist();
 		acWhitelist.setAcUrls(acUrls);
 
 		return acWhitelist;

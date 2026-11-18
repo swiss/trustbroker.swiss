@@ -225,7 +225,8 @@ public class ArtifactResolutionService {
 
 	public void resolveArtifact(HttpServletRequest request, HttpServletResponse response) {
 		try {
-			var artifactResolve = SoapUtil.extractSamlObjectFromEnvelope(request.getInputStream(), ArtifactResolve.class);
+			var envelope = SoapUtil.readEnvelope(request.getInputStream());
+			var artifactResolve = SoapUtil.extractSamlObjectFromEnvelope(envelope, ArtifactResolve.class);
 			var issuerId = artifactResolve.getIssuer().getValue();
 			var refererUrl = WebUtil.getReferer(request);
 			var artifactId = artifactResolve.getArtifact().getValue();

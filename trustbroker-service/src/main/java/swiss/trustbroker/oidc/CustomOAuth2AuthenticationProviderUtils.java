@@ -28,9 +28,9 @@ package swiss.trustbroker.oidc;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nonnull;
 
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -182,7 +182,8 @@ public class CustomOAuth2AuthenticationProviderUtils {
 		return refreshToken;
 	}
 
-	public static @NonNull DefaultOAuth2TokenContext generateTokenContextForTokenExchange(
+	@Nonnull
+	public static DefaultOAuth2TokenContext generateTokenContextForTokenExchange(
 			OAuth2TokenType tokenType, OAuth2AuthorizationGrantAuthenticationToken tokenExchangeAuthentication, RegisteredClient registeredClient,
 			Authentication principal, Set<String> authorizedScopes, Jwt dPoPProof) {
 		var tokenContextBuilder = DefaultOAuth2TokenContext.builder()

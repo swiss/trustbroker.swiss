@@ -623,7 +623,8 @@ public class SamlMockMessageService {
 	}
 
 	public void resolveArtifact(HttpServletRequest request, HttpServletResponse response) throws IOException {
-		var artifactResolve = SoapUtil.extractSamlObjectFromEnvelope(request.getInputStream(), ArtifactResolve.class);
+		var envelope = SoapUtil.readEnvelope(request.getInputStream());
+		var artifactResolve = SoapUtil.extractSamlObjectFromEnvelope(envelope, ArtifactResolve.class);
 		var artifactId = artifactResolve.getArtifact().getValue();
 		log.info("Received ArtifactResolve with id={} from issuerId={} for artifact={}",
 				artifactResolve.getID(), artifactResolve.getIssuer().getValue(), artifactId);

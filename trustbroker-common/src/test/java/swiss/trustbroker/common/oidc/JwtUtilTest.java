@@ -21,17 +21,22 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import com.nimbusds.jose.EncryptionMethod;
 import com.nimbusds.jose.JWEAlgorithm;
 import com.nimbusds.jose.JWEHeader;
+import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.EncryptedJWT;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.opensaml.security.credential.Credential;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
@@ -41,6 +46,35 @@ import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.test.saml.util.SamlTestBase;
 
 class JwtUtilTest {
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("getCnfValueFromHeaderCases")
+	void getCnfValueFromHeaderTest(String testName, Map<String, Object> header, String expectedJkt,
+			String expectedErrorMessage) {
+		if (expectedErrorMessage == null) {
+			var cnf = JwtUtil.getCnfValueFromHeader(header);
+			assertEquals(1, cnf.size());
+			assertEquals(expectedJkt, cnf.get(OidcUtil.OIDC_TOKEN_JKT));
+		}
+		else {
+			var ex = assertThrows(TechnicalException.class, () -> JwtUtil.getCnfValueFromHeader(header));
+			assertEquals("Service rejected", ex.getMessage());
+			assertEquals(expectedErrorMessage, ex.getInternalMessage());
+		}
+	}
+
+	private static Stream<Arguments> getCnfValueFromHeaderCases() throws Exception {
+		var validJwk = Map.<String, Object>of("kty", "oct", "k", "GawgguFyGrWKav7AX4VKUg");
+		var expectedJkt = JWK.parse(validJwk).computeThumbprint().toString();
+
+		return Stream.of(
+				Arguments.of("returns jkt for valid jwk", Map.of(OidcUtil.OIDC_HEADER_JWK, validJwk), expectedJkt, null),
+				Arguments.of("throws when jwk header is not a map", Map.of(OidcUtil.OIDC_HEADER_JWK, "not-a-map"), null,
+						"Invalid DPoP JWK header"),
+				Arguments.of("throws when jwk map cannot be parsed", Map.of(OidcUtil.OIDC_HEADER_JWK, Map.of("kty", "oct")),
+						null, "Could not parse DPoP JWK header")
+		);
+	}
 
 	@Test
 	void validateTokenTest() {

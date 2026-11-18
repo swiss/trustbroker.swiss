@@ -31,7 +31,7 @@ import swiss.trustbroker.api.sessioncache.dto.SessionState;
  *
  * @see ProfileSelectionService
  */
-@Service
+@Service("default")
 @ConditionalOnMissingBean(ProfileSelectionService.class)
 @Slf4j
 public class NoOpProfileSelectionService implements ProfileSelectionService {

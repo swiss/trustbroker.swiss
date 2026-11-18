@@ -219,13 +219,13 @@ public class OidcClient implements Serializable {
 
 	public boolean isValidRedirectUri(String requestedRedirectUri) {
 		return redirectUris != null &&
-				UrlAcceptor.isRedirectUrlOkForAccess(requestedRedirectUri, redirectUris.getAcNetUrls());
+				UrlAcceptor.isRedirectUrlOkForAccess(requestedRedirectUri, redirectUris.getAcUrls());
 	}
 
 	public boolean isValidRedirectUris(List<String> requestedRedirectUris) {
 		return redirectUris != null && requestedRedirectUris != null &&
 				requestedRedirectUris.stream()
-									 .anyMatch(u -> UrlAcceptor.isRedirectUrlOkForAccess(u, redirectUris.getAcNetUrls()));
+									 .anyMatch(u -> UrlAcceptor.isRedirectUrlOkForAccess(u, redirectUris.getAcUrls()));
 	}
 
 	public boolean isTrustedOrigin(String origin) {

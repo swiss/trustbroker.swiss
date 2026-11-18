@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.event.Level;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticatedPrincipal;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -634,12 +635,23 @@ public class OidcSessionSupport {
 		if (ApiSupport.isSpringFederationPath(path) && HttpExchangeSupport.getRunningHttpSession() == null) {
 			var origin = StringUtil.clean(WebUtil.getOrigin(request));
 			var referer = StringUtil.clean(WebUtil.getReferer(request));
+			var accept = StringUtil.clean(request.getHeader(HttpHeaders.ACCEPT));
 			var cookies = StringUtil.clean(request.getHeader(HttpHeaders.COOKIE));
 			var userAgent = StringUtil.clean(request.getHeader(HttpHeaders.USER_AGENT));
-			throw new RequestDeniedException(StandardErrorCode.STATE_NOT_FOUND, String.format(
-					"OIDC session on federation redirect missing on path='%s' userAgent='%s' referer='%s' origin='%s' cookies='%s'."
+			var message = String.format(
+					"OIDC session on federation redirect missing on path='%s' "
+							+ "userAgent='%s' referer='%s' origin='%s' cookies='%s' accept='%s'."
 							+ " HINT: Check perimeterUrl and sessionCookieSameSite configurations.",
-					path, userAgent, referer, origin, cookies));
+					path, userAgent, referer, origin, cookies, accept);
+			// based on org.springframework.security.web.savedrequest.HttpSessionRequestCache.saveRequest bail-out conditions -
+			// application/json is used by technical clients and the session is not saved there, hence it won't be found on
+			// the next request.
+			if (accept != null && accept.contains(MediaType.APPLICATION_JSON_VALUE)) {
+				log.info(message + " This is a REST client request, so the session was not saved on the server side.");
+			}
+			else {
+				throw new RequestDeniedException(StandardErrorCode.STATE_NOT_FOUND, message);
+			}
 		}
 	}
 

@@ -74,6 +74,7 @@ import swiss.trustbroker.mapping.dto.QoaConfig;
 import swiss.trustbroker.mapping.dto.QoaSpec;
 import swiss.trustbroker.mapping.service.QoaMappingService;
 import swiss.trustbroker.oidc.client.service.AuthorizationCodeFlowService;
+import swiss.trustbroker.saml.dto.RpRequest;
 import swiss.trustbroker.script.service.ScriptService;
 import swiss.trustbroker.sessioncache.dto.StateData;
 import swiss.trustbroker.sessioncache.service.StateCacheService;
@@ -201,9 +202,13 @@ class ClaimsProviderServiceTest {
 				.ssoUrl(ssoUrl)
 				.authnRequestIssuerId(customIssuer)
 				.saml(
-						Saml.builder().artifactBinding(
-								ArtifactBinding.builder().outboundMode(ArtifactBindingMode.SUPPORTED).build()
-						).build()
+						Saml.builder()
+							.enabled(true)
+							.forwardRpProtocolBinding(true)
+							.artifactBinding(
+									ArtifactBinding.builder().outboundMode(ArtifactBindingMode.SUPPORTED).build()
+							)
+							.build()
 				)
 				.securityPolicies(
 						SecurityPolicies.builder()
@@ -216,6 +221,7 @@ class ClaimsProviderServiceTest {
 		doReturn(cp).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(cpIssuer, null);
 
 		var samlProperties = new SamlProperties();
+		samlProperties.setEnabled(true);
 		var acsUrl = "https://localhost:1234/consumer";
 		samlProperties.setConsumerUrl(acsUrl);
 		doReturn(samlProperties).when(trustBrokerProperties).getSaml();
@@ -234,6 +240,10 @@ class ClaimsProviderServiceTest {
 				.when(qoaMappingService).getQoaConfiguration(spstateData, relyingParty);
 		doNothing().when(samlOutputService).sendRequest(requestCaptor.capture(),
 				eq(credential), eq(relayState), eq(ssoUrl), eq(response), eq(encodingParams), eq(DestinationType.CP));
+
+		var requestCaptorRp = ArgumentCaptor.forClass(RpRequest.class);
+		doNothing().when(scriptService).processRpOnCpRequest(eq(rpIssuer), requestCaptorRp.capture(), any());
+
 		var auditCaptor = ArgumentCaptor.forClass(AuditDto.class);
 		doNothing().when(auditService).logOutboundFlow(auditCaptor.capture());
 		doReturn(new QoaSpec(QoaComparison.EXACT, List.of(contextClass)))
@@ -244,9 +254,8 @@ class ClaimsProviderServiceTest {
 		// run
 		claimsProviderService.sendAuthnRequestToCp(request, response, stateData, cp);
 
-		// verify request
+		// verify SAML request
 		var authnRequest = requestCaptor.getValue();
-
 		assertThat(authnRequest.getID(), is(stateData.getId()));
 		assertThat(authnRequest.getIssueInstant(), is(not(nullValue())));
 		assertThat(authnRequest.getIssuer(), is(not(nullValue())));
@@ -256,6 +265,11 @@ class ClaimsProviderServiceTest {
 		assertThat(authnRequest.getNameIDPolicy().getFormat(), is(NameIDType.UNSPECIFIED));
 		assertThat(authnRequest.getDestination(), is(ssoUrl));
 		assertThat(authnRequest.isForceAuthn(), is(true));
+
+		// verify RP request
+		var rpRequest = requestCaptorRp.getValue();
+		assertThat(rpRequest.getRpIssuer(), is(rpIssuer));
+		assertThat(rpRequest.getReferer(), is(referrer));
 
 		// context class
 		assertThat(authnRequest.getRequestedAuthnContext(), is(not(nullValue())));
@@ -275,7 +289,8 @@ class ClaimsProviderServiceTest {
 		assertThat(auditDto.getReferrer(), is(referrer));
 
 		// script hook
-		verify(scriptService).processCpOnRequest(cpIssuer, authnRequest);
+		verify(scriptService).processRpOnCpRequest(rpIssuer, rpRequest, authnRequest);
+		verify(scriptService).processCpOnCpRequest(cpIssuer, rpRequest, authnRequest);
 	}
 
 	private StateData givenStateWithQoa() {

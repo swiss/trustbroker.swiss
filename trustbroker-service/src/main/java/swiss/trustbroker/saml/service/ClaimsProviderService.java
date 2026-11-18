@@ -81,8 +81,10 @@ public class ClaimsProviderService {
 
 	private final AuthorizationCodeFlowService authorizationCodeFlowService;
 
-	private AuthnRequest createAndSignCpAuthnRequest(StateData stateData, RelyingParty relyingParty,
-			SamlBinding requestedResponseBinding, QoaSpec qoaSpec, ClaimsParty claimsProvider, boolean delegateOrigin) {
+	private AuthnRequest createAndSignCpAuthnRequest(
+			StateData stateData, RelyingParty relyingParty, RpRequest rpRequest,
+			SamlBinding requestedResponseBinding, QoaSpec qoaSpec,
+			ClaimsParty claimsProvider, boolean delegateOrigin) {
 		var cpIssuer = claimsProvider.getId();
 		var ssoUrl = claimsProvider.getSsoUrl();
 		if (ssoUrl == null) {
@@ -121,7 +123,8 @@ public class ClaimsProviderService {
 		setForceAuthnAndAcUrl(stateData, authnRequest, consumerUrl, claimsProvider);
 
 		// OnRequest hook
-		scriptService.processCpOnRequest(cpIssuer, authnRequest);
+		scriptService.processRpOnCpRequest(rpRequest.getRpIssuer(), rpRequest, authnRequest);
+		scriptService.processCpOnCpRequest(cpIssuer, rpRequest, authnRequest);
 
 		var signatureParameters = claimsProvider.getSignatureParametersBuilder()
 				.credential(relyingParty.getRpSigner())
@@ -259,10 +262,11 @@ public class ClaimsProviderService {
 				.applicationName(spStateData.getApplicationName())
 				.context(context) // RP initiated internal state
 				.build();
-		scriptService.processCpBeforeRequest(cpIssuer, rpRequest);
+		scriptService.processRpBeforeCpRequest(rpIssuer, rpRequest);
+		scriptService.processCpBeforeCpRequest(cpIssuer, rpRequest);
+		// skip ScriptChangeHelper.updateStateOnScriptChanges because QoA handling might affect RP response processing
 
-		var requestedResponseBinding = spStateData.getRequestedResponseBinding();
-
+		// assert result
 		var claimsProviderOpt = relyingPartySetupService.getClaimsProviderSetupByIssuerId(cpIssuer);
 		if (claimsProviderOpt.isEmpty()) {
 			throw new RequestDeniedException(String.format(
@@ -284,7 +288,8 @@ public class ClaimsProviderService {
 		var deviceId = WebSupport.getDeviceId(request);
 		// forward using SAML protocol depending on binding
 		if (claimsParty.isSamlEnabled(trustBrokerProperties.getSaml().isEnabled())) {
-			var authnRequest = createAndSignCpAuthnRequest(stateData, relyingParty, requestedResponseBinding,
+			var requestedResponseBinding = spStateData.getRequestedResponseBinding();
+			var authnRequest = createAndSignCpAuthnRequest(stateData, relyingParty, rpRequest, requestedResponseBinding,
 				qoaSpec, claimsProvider, delegateOrigin(cpIssuer));
 			saveCorrelatedStateDataWithState(cpIssuer, deviceId, stateData);
 			redirectUserWithRequest(authnRequest, relyingParty.getRpSigner(), response, claimsParty, stateData, samlOutputService);

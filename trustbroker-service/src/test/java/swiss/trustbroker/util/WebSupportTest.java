@@ -382,4 +382,46 @@ class WebSupportTest {
 		                    .internetNetworkName("INTERNET")
 		                    .build();
 	}
+
+
+	@ParameterizedTest
+	@MethodSource
+	void isNetworkAllowed(String network, List<String> allowedNetworks, boolean enforce, boolean expected) {
+		var config = givenNetworkConfig();
+		var request = new MockHttpServletRequest();
+		if (network != null) {
+			request.addHeader(config.getNetworkHeader(), network);
+		}
+		assertThat(WebSupport.isNetworkAllowed("Test", allowedNetworks, enforce, config, request), is(expected));
+	}
+
+	static Object[][] isNetworkAllowed() {
+		var config = givenNetworkConfig();
+		return new Object[][] {
+				{ null, null, false, true },
+				{ null, null, true, true },
+				{ config.getInternetNetworkName(), null, true, true },
+				{ config.getInternetNetworkName(), Collections.emptyList(), true, true },
+				{ config.getInternetNetworkName(), List.of(config.getIntranetNetworkName()), false, true }, // not enforced, NOK
+				{ config.getInternetNetworkName(), List.of(config.getInternetNetworkName()), true, true }, // enforced,OK
+				{ config.getIntranetNetworkName(), List.of(config.getInternetNetworkName(), config.getIntranetNetworkName()),
+						true, true }, // enforced,OK
+				{ config.getInternetNetworkName(), List.of(config.getIntranetNetworkName()), true, false } // enforced, OK
+		};
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+		"null,null,false,true",
+		"10.10.10.10,null,false,true",
+		"10.10.10.10,null,true,true",
+		"10.10.10.10,,true,true",
+		"10.10.10.10,^99\\..*$,false,true", // not enforced, NOK
+		"10.10.10.10,^99\\.*$,true,false", // enforced, NOK
+		"10.10.10.10,^(99\\..*|10\\.99\\..*)$,true,false", // enforced, NOK
+		"10.10.10.10,^(99\\..*|10\\.10\\..*)$,true,true" // enforced, OK
+	}, nullValues = "null")
+	void isClientIpAllowed(String ip, String regex, boolean enforce, boolean expected) {
+		assertThat(WebSupport.isClientIpAllowed("Test", regex, enforce, ip), is(expected));
+	}
 }

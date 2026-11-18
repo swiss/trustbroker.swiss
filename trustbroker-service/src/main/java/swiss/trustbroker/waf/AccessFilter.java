@@ -18,7 +18,7 @@ package swiss.trustbroker.waf;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -86,22 +86,24 @@ public class AccessFilter implements Filter {
 				.stream()
 				.map(Pattern::quote) // escape regex characters
 				.collect(Collectors.joining("|"));
+		var oidcPaths = trustBrokerProperties.getOidc().isEnabled() ?
+			"|/oauth2/.*|/login/.*|/login|/logout|/logout/.*|/realms/.*|/saml2/.*|/userinfo|/.well-known/openid-configuration" : "";
 		return "^("
-				// SPA - see app-routing-module and AppController code
+				// SPA (see app-routing-module and AppController code)
 				+ "/app|/app/.*"
-				// APIs (/adfs/ls included below)
+				// APIs (excluding compatibility endpoints)
 				+ "|/api/v1/.*"
-				// configured endpoints:
+				// Configured perimeter endpoints
 				+ "|" + perimeterPathsRegex
-				// default SAML endpoints
+				// SAML endpoints (compatibility mode)
 				+ "|/adfs/.*|/FederationMetadata/.*|/federationmetadata/.*"
+				// OIDC services (spring-authorization-server and Keycloak compatibility)
+				+ oidcPaths
 				// assets referenced by UI (some of which are unfortunately in the context root)
 				+ "|/assets/.*|/js/.*|/[^/]*.(js|css|woff2?|ttf|eot|svg)"
 				+ "|/index.html"
 				+ "|/favicon.ico"
 				+ "|/robots.txt"
-				// OIDC services (spring-authorization-server and Keycloak compatibility)
-				+ "|/oauth2/.*|/login/.*|/login|/logout|/logout/.*|/realms/.*|/saml2/.*|/userinfo|/.well-known/openid-configuration"
 				+ ")$";
 	}
 
@@ -200,7 +202,7 @@ public class AccessFilter implements Filter {
 
 	// validate headers or parameters against a blocked list and send 404 if any are found
 	private boolean validateAndBlockRequest(HttpServletRequest httpRequest, HttpServletResponse httpResponse,
-			List<String> blockedNames, Function<String, String> getter, String type) throws IOException {
+			List<String> blockedNames, UnaryOperator<String> getter, String type) throws IOException {
 		if (CollectionUtils.isEmpty(blockedNames)) {
 			return false;
 		}
@@ -221,11 +223,12 @@ public class AccessFilter implements Filter {
 	}
 
 	// returns a non-null string for logging if blocked
-	private static String checkBlocked(String name, Function<String, String> getter) {
+	private static String checkBlocked(String name, UnaryOperator<String> getter) {
 		var value = getter.apply(name);
 		if (value != null) {
 			return StringUtil.clean(name) + '=' + StringUtil.clean(value);
 		}
 		return null;
 	}
+
 }

@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -98,9 +97,9 @@ class AttributeFilterUtilTest {
 							   .name(CoreAttributeName.CONVERSATION_ID.getName())
 							   .namespaceUri(CoreAttributeName.CONVERSATION_ID.getNamespaceUri())
 							   .build();
-		userDetails.put(email, new ArrayList<>(Arrays.asList("user@trustbroker.swiss")));
-		userDetails.put(userExtId, new ArrayList<>(Arrays.asList("idm98765")));
-		userDetails.put(convId, new ArrayList<>(Arrays.asList("tmp-2324")));
+		userDetails.put(email, new ArrayList<>(List.of("user@trustbroker.swiss")));
+		userDetails.put(userExtId, new ArrayList<>(List.of("idm98765")));
+		userDetails.put(convId, new ArrayList<>(List.of("tmp-2324")));
 
 		return userDetails;
 	}

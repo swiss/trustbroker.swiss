@@ -16,6 +16,7 @@
 package swiss.trustbroker.sessioncache.dto;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -24,8 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import swiss.trustbroker.common.util.OidcUtil;
+import swiss.trustbroker.saml.dto.CpResponse;
 
 class StateDataTest {
 
@@ -87,5 +93,36 @@ class StateDataTest {
 				new SsoSessionParticipant("rpIssuer1", "cpIssuer1", "acs1", null, null),
 				new SsoSessionParticipant("rpIssuer1", "cpIssuer2", "acs1", null, null),
 				new SsoSessionParticipant("rpIssuer2", "cpIssuer2", "acs2", null, null)));
+	}
+
+	@ParameterizedTest
+	@MethodSource("setOidcScopesCases")
+	void setOidcScopes(String testName, Map<String, String> rpContext, String expectedScopes, List<String> expectedParsedScopes) {
+		var sourceState = StateData.builder().id("id").rpContext(rpContext).build();
+		var cpResponse = new CpResponse();
+
+		var result = StateData.setOidcScopes(cpResponse, sourceState);
+
+		assertThat(result, is(expectedScopes));
+		if (expectedParsedScopes == null) {
+			assertThat(cpResponse.getOidcScopes(), is(nullValue()));
+		}
+		else {
+			assertThat(cpResponse.getOidcScopes(), contains(expectedParsedScopes.toArray(new String[0])));
+		}
+	}
+
+	static Object[][] setOidcScopesCases() {
+		return new Object[][] {
+				{ "null rpContext", null, null, null },
+				{ "missing scope entry", Map.of("client_id", "test-client"), null, null },
+				{ "blank scope value", Map.of(OidcUtil.OIDC_SCOPE, "   "), "   ", null },
+				{
+						"split dedupe preserve order",
+						Map.of(OidcUtil.OIDC_SCOPE, "openid profile email openid profile"),
+						"openid profile email openid profile",
+						List.of("openid", "profile", "email")
+				}
+		};
 	}
 }

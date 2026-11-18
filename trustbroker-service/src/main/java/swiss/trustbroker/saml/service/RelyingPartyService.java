@@ -232,6 +232,15 @@ public class RelyingPartyService {
 		}
 	}
 
+	// support outbound handling of incoming rp_txn_id by allowing to pick it from PROPS (no SSO propagation)
+	static void adjustRpTxnIdProperty(StateData stateData, CpResponse cpResponse) {
+		if (stateData != null && stateData.getRpTxnId() != null) {
+			cpResponse.setProperty(CoreAttributeName.TXN_ID.getName(),
+					CoreAttributeName.TXN_ID.getNamespaceUri(),
+					stateData.getRpTxnId());
+		}
+	}
+
 	private String computeClientExtId(CpResponse cpResponse) {
 		String clientExtId = cpResponse.getClientExtId();
 		if (clientExtId != null) {
@@ -436,9 +445,8 @@ public class RelyingPartyService {
 		// Return from SSO step-up
 		var hrdSelectedClaimsParty = getHrdSelectedClaimsParty(idpStateData);
 		var subjectNameId = cpResponse.getNameId();
-		var ssoSubject = SsoService.getSsoSubject(idpStateData, claimsParty);
 		var stateByCookieId = ssoService.findValidStateFromCookies(
-				relyingParty, hrdSelectedClaimsParty, ssoSubject != null ? ssoSubject : subjectNameId, httpServletRequest.getCookies());
+				relyingParty, hrdSelectedClaimsParty, idpStateData, httpServletRequest.getCookies());
 		var stateDataForResponse = stateByCookieId.orElse(null);
 		if (stateDataForResponse != null) {
 			log.debug("Session state={} found based on cookie, checking SSO for incomingDeviceId={}",
@@ -1086,6 +1094,7 @@ public class RelyingPartyService {
 
 		// Adjust final settings
 		adjustSsoSessionIdProperty(stateData, cpResponse);
+		adjustRpTxnIdProperty(stateData, cpResponse);
 
 		// Avoid State.cpResponse modification
 		var cpResponseClone = SerializationUtils.clone(cpResponse);
@@ -1302,6 +1311,8 @@ public class RelyingPartyService {
 				AssertionValidator.validateRequestSignature(logoutRequest, signingRp.getRpTrustCredentials(),
 						signingRp.getAllowedSignatureAlgorithms(trustBrokerProperties.getSecurity().getAllowedSignatureAlgorithms()),
 						trustBrokerProperties, signatureContext);
+				AssertionValidator.validateLogoutRequestDestination(logoutRequest, signatureContext.getBinding(),
+						trustBrokerProperties, signingRp.getSecurityPolicies());
 			}
 			else {
 				log.error("trustbroker.config.security.validateAuthnRequest=false: Security on LogoutRequest disabled!!!");
@@ -1528,6 +1539,8 @@ public class RelyingPartyService {
 								   .nameId(subject)
 								   .attributes(cpOriginalAttributes)
 								   .originalAttributes(cpOriginalAttributes)
+								   .oidcClientId(rpOidcClient.getId())
+								   .oidcScopes(authorizedScopes)
 								   .issuer(claimsParty.getId())
 								   .rpIssuer(relyingParty.getId())
 								   .originalNameId(subject)

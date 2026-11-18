@@ -38,6 +38,7 @@ import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.QualityOfAuthenticationConfig;
 import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.federation.xmlconfig.AcClass;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
@@ -384,7 +385,7 @@ class OidcClaimValidatorServiceTest {
 						 .id(CLIENT_ID)
 						 .clientSecret("secret1")
 						 .redirectUris(AcWhitelist.builder()
-												  .acUrls(List.of("https://localhost/test"))
+												  .acUrls(List.of(AcUrl.of("https://localhost/test")))
 												  .build())
 
 						 .build();

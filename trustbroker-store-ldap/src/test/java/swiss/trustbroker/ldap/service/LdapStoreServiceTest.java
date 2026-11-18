@@ -49,24 +49,24 @@ import swiss.trustbroker.federation.xmlconfig.ProfileSelectionMode;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
 import swiss.trustbroker.saml.dto.CpResponse;
 
-@SpringBootTest(classes = { LdapService.class })
+@SpringBootTest(classes = { LdapStoreService.class })
 @TestPropertySource(properties = "trustbroker.config.ldap.enabled=true")
-class LdapServiceTest {
+class LdapStoreServiceTest {
 
 	@MockitoBean
-	LdapClient ldapClient;
+	LdapStoreClient ldapClient;
 
 	@MockitoBean
 	TrustBrokerProperties trustBrokerProperties;
 
 	@Autowired
-	LdapService ldapService;
+	LdapStoreService ldapStoreService;
 
 	@Test
 	void getLdapAttributesTest() {
 		Map<String, Object> state = new HashMap<>();
 
-		var ldapConfig = new LdapStoreConfig(true, "UNDEF", ":");
+		var ldapConfig = new LdapStoreConfig(true, Map.of(), "UNDEF", ":");
 		doReturn(ldapConfig).when(trustBrokerProperties).getLdap();
 
 		var cpResponse = givenCpResponse();
@@ -76,7 +76,7 @@ class LdapServiceTest {
 		doReturn(givenLdapAttributes()).when(ldapClient).search(eq(rpConfig), eq(cpResponse), eq(userQuery), any(), any());
 
 		var ldapResult = new IdmResult();
-		ldapService.getLdapAttributes(rpConfig, cpResponse, userQuery, state, ldapResult);
+		ldapStoreService.getLdapAttributes(rpConfig, cpResponse, userQuery, state, ldapResult);
 		Map<AttributeName, List<String>> userDetails = ldapResult.getUserDetails();
 		assertEquals(3, userDetails.size());
 		assertTrue(userDetails.get(Definition.builder().name("uid").source("IDM:LDAP").build()).getFirst().contains("mail"));
@@ -89,7 +89,7 @@ class LdapServiceTest {
 	@Test
 	void getLdapAttributesOrgSelectionTest() {
 		Map<String, Object> state = new HashMap<>();
-		var ldapConfig = new LdapStoreConfig(true, "UNDEF", ":");
+		var ldapConfig = new LdapStoreConfig(true, Map.of(), "UNDEF", ":");
 		doReturn(ldapConfig).when(trustBrokerProperties).getLdap();
 
 		var cpResponse = givenCpResponse();
@@ -101,7 +101,7 @@ class LdapServiceTest {
 		doReturn(givenOrgs()).when(ldapClient).search(eq(rpConfig), eq(cpResponse), eq(orgQuery), any(), any());
 
 		var ldapResult = new IdmResult();
-		ldapService.getLdapAttributes(rpConfig, cpResponse, userQuery, state, ldapResult);
+		ldapStoreService.getLdapAttributes(rpConfig, cpResponse, userQuery, state, ldapResult);
 		Map<AttributeName, List<String>> userDetails = ldapResult.getUserDetails();
 		assertEquals(3, userDetails.size());
 		assertTrue(userDetails.get(Definition.builder().name("uid").source("IDM:LDAP").build()).getFirst().contains("mail"));
@@ -111,18 +111,22 @@ class LdapServiceTest {
 		assertTrue(orgIds.getFirst().contains("mail"));
 
 		var ldapOrgResult = new IdmResult();
-		ldapService.getLdapAttributes(rpConfig, cpResponse, orgQuery, state, ldapOrgResult);
+		ldapStoreService.getLdapAttributes(rpConfig, cpResponse, orgQuery, state, ldapOrgResult);
 		Map<AttributeName, List<String>> userDetailsWithTranslation = ldapOrgResult.getUserDetails();
-		assertEquals(4, userDetailsWithTranslation.size());
-		assertEquals(3, userDetailsWithTranslation.get(Definition.builder().name("translation").source("IDM:LDAP").build()).size());
+		assertEquals(1, userDetailsWithTranslation.size());
+		var translations = userDetailsWithTranslation.get(Definition.builder().name("translation").source("IDM:ORGANIZATION").build());
+		assertEquals(3, translations.size());
+		assertTrue(translations.contains("mail1:10:translation1"));
+		assertTrue(translations.contains("mail1:101:translation2"));
+		assertTrue(translations.contains("mail2:101:translation2"));
 	}
 
 	@Test
 	void getLdapAttributesUsesStateFallbackWhenSearchReturnsNoAttrs() {
 		Map<String, Object> state = new HashMap<>();
-		state.put(LdapService.UNPROCESSED_ATTRIBUTES, givenLdapAttributes());
+		state.put(LdapStoreService.UNPROCESSED_ATTRIBUTES, givenLdapAttributes());
 
-		var ldapConfig = new LdapStoreConfig(true, "UNDEF", ":");
+		var ldapConfig = new LdapStoreConfig(true, Map.of(), "UNDEF", ":");
 		doReturn(ldapConfig).when(trustBrokerProperties).getLdap();
 
 		var cpResponse = givenCpResponse();
@@ -134,7 +138,7 @@ class LdapServiceTest {
 		doReturn(List.of()).when(ldapClient).search(eq(rpConfig), eq(cpResponse), eq(userQuery), any(), any());
 
 		var ldapResult = new IdmResult();
-		ldapService.getLdapAttributes(rpConfig, cpResponse, userQuery, state, ldapResult);
+		ldapStoreService.getLdapAttributes(rpConfig, cpResponse, userQuery, state, ldapResult);
 
 		Map<AttributeName, List<String>> userDetails = ldapResult.getUserDetails();
 		var mailKey = Definition.builder().name("mail").source("IDM:LDAP").build();
@@ -150,9 +154,9 @@ class LdapServiceTest {
 		staleEntry.put("mail", List.of("staleMail"));
 		staleEntry.put("orgId", List.of("999"));
 		staleStateAttrs.add(staleEntry);
-		state.put(LdapService.UNPROCESSED_ATTRIBUTES, staleStateAttrs);
+		state.put(LdapStoreService.UNPROCESSED_ATTRIBUTES, staleStateAttrs);
 
-		var ldapConfig = new LdapStoreConfig(true, "UNDEF", ":");
+		var ldapConfig = new LdapStoreConfig(true, Map.of(), "UNDEF", ":");
 		doReturn(ldapConfig).when(trustBrokerProperties).getLdap();
 
 		var cpResponse = givenCpResponse();
@@ -162,13 +166,57 @@ class LdapServiceTest {
 		doReturn(givenLdapAttributes()).when(ldapClient).search(eq(rpConfig), eq(cpResponse), eq(userQuery), any(), any());
 
 		var ldapResult = new IdmResult();
-		ldapService.getLdapAttributes(rpConfig, cpResponse, userQuery, state, ldapResult);
+		ldapStoreService.getLdapAttributes(rpConfig, cpResponse, userQuery, state, ldapResult);
 
 		Map<AttributeName, List<String>> userDetails = ldapResult.getUserDetails();
 		var mailKey = Definition.builder().name("mail").source("IDM:LDAP").build();
 		assertTrue(userDetails.containsKey(mailKey));
 		assertEquals(2, userDetails.get(mailKey).size());
 		assertFalse(userDetails.get(mailKey).contains("staleMail"));
+	}
+
+	@Test
+	void getAttributesDelegatesAndExposesMetadata() {
+		Map<String, Object> state = new HashMap<>();
+		var ldapConfig = new LdapStoreConfig(true, Map.of(), "UNDEF", ":");
+		doReturn(ldapConfig).when(trustBrokerProperties).getLdap();
+
+		var cpResponse = givenCpResponse();
+		var rpConfig = givenRpConfigWithDisabledProfileSelection();
+		var userQuery = rpConfig.getIdmLookup().getQueryList().getFirst();
+		doReturn(givenLdapAttributes()).when(ldapClient).search(eq(rpConfig), eq(cpResponse), eq(userQuery), any(), any());
+
+		var ldapResult = new IdmResult();
+		assertTrue(ldapStoreService.getAttributes(rpConfig, cpResponse, userQuery, null, state, ldapResult));
+		assertEquals(Integer.MAX_VALUE, ldapStoreService.getServiceDefaultOrder());
+		assertEquals("LDAP", ldapStoreService.getStoreName());
+		assertEquals(2, ldapResult.getLastQueryUserDetailsCount());
+		assertEquals(3, ldapResult.getUserDetails().size());
+	}
+
+	@Test
+	void prefixProfileAttributesSingleProfileAppliesN2k() {
+		var ldapConfig = new LdapStoreConfig(true, Map.of(), "UNDEF", ":");
+		doReturn(ldapConfig).when(trustBrokerProperties).getLdap();
+
+		var profileSelection = ProfileSelection.builder()
+				.enabled(true)
+				.needToKnow(true)
+				.mode(ProfileSelectionMode.INTERACTIVE)
+				.profileSelector("mail")
+				.build();
+		var rpConfig = RelyingParty.builder().id("relyingPartyId").profileSelection(profileSelection).build();
+		Map<String, List<String>> profile = new HashMap<>();
+		profile.put("uid", List.of("mail1:uid1"));
+		profile.put("mail", List.of("mail1"));
+		profile.put("orgId", List.of("10"));
+		List<Map<String, List<String>>> attrs = new ArrayList<>();
+		attrs.add(profile);
+
+		var processedProfiles = ldapStoreService.prefixProfileAttributes(rpConfig, profileSelection, new ArrayList<>(), attrs, "LDAP");
+
+		assertEquals(List.of("uid1"), processedProfiles.getFirst().get("uid"));
+		assertEquals(List.of("mail1"), processedProfiles.getFirst().get("mail"));
 	}
 
 	private static RelyingParty givenRpConfig(String orgSelector) {
@@ -225,15 +273,26 @@ class LdapServiceTest {
 
 	@Test
 	void getProfileSelectorTest() {
-		assertNull(ldapService.getProfileSelector(null, "RP_ID"));
-		assertEquals("mail", ldapService.getProfileSelector("mail", "RP_ID"));
+		assertNull(ldapStoreService.getProfileSelector(null, "RP_ID"));
+		assertEquals("mail", ldapStoreService.getProfileSelector("mail", "RP_ID"));
+		assertEquals("mail", ldapStoreService.getProfileSelector("IDM:LDAP:mail", "RP_ID"));
 	}
 
 	@Test
 	void prefixValuesWithProfileSelectorTest() {
 		Map<String, List<String>> profile = givenLdapAttributes().getFirst();
-		ldapService.prefixValuesWithProfileSelector("mail1", null, profile);
+		ldapStoreService.prefixValuesWithProfileSelector("mail1", null, profile);
 		assertTrue(profile.get("uid").contains("mail1:uid1"));
+	}
+
+	@Test
+	void prefixValuesWithProfileSelectorIgnoresNullSelectorValue() {
+		Map<String, List<String>> profile = new HashMap<>(givenLdapAttributes().getFirst());
+		Map<String, List<String>> original = new HashMap<>(profile);
+
+		ldapStoreService.prefixValuesWithProfileSelector(null, "mail", profile);
+
+		assertEquals(original, profile);
 	}
 
 	@Test
@@ -246,15 +305,15 @@ class LdapServiceTest {
 		attrs.add(noSelector);
 
 		var ex = assertThrows(TechnicalException.class,
-				() -> ldapService.prefixProfileAttributes(rpConfig, profileSelection, attrs));
+				() -> ldapStoreService.prefixProfileAttributes(rpConfig, profileSelection, attrs, attrs, "LDAP"));
 		assertThat(ex.getInternalMessage(), containsString("attributes not found"));
 	}
 
 	@Test
 	void userWithMultiProfilesTest() {
-		assertFalse(ldapService.userWithMultiProfiles(givenLdapAttributes(), null));
-		assertFalse(ldapService.userWithMultiProfiles(givenLdapAttributes(), "unknownSelector"));
-		assertTrue(ldapService.userWithMultiProfiles(givenLdapAttributes(), "mail"));
+		assertFalse(ldapStoreService.userWithMultiProfiles(givenLdapAttributes(), null));
+		assertFalse(ldapStoreService.userWithMultiProfiles(givenLdapAttributes(), "unknownSelector"));
+		assertTrue(ldapStoreService.userWithMultiProfiles(givenLdapAttributes(), "mail"));
 	}
 
 	private static CpResponse givenCpResponse() {

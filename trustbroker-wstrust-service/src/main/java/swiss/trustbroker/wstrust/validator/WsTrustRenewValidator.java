@@ -132,7 +132,7 @@ public class WsTrustRenewValidator extends WsTrustBaseValidator {
 																	   .build();
 		validateAssertion(assertion, expectedValues, signerTrustCredentials,
 				getTrustBrokerProperties().getSecurity().getAllowedSignatureAlgorithms(),
-				true,null, null,null);
+				getTrustBrokerProperties().getWstrust().isRenewRequireSignedAssertions(),null, null,null);
 		validateSecurityToken(requestHeader.getSecurityToken(), relyingParty);
 		return WsTrustValidationResult.builder()
 									  .requestType(REQUEST_TYPE)
@@ -184,16 +184,15 @@ public class WsTrustRenewValidator extends WsTrustBaseValidator {
 					acsUrl.get(), relyingParty.getId());
 			return relyingParty.getId(); // should fail validation
 		}
-		for (var check : relyingParty.getAcWhitelist().getAcNetUrls()) {
+		for (var check : relyingParty.getAcWhitelist().getAcUrls()) {
 			if (UrlAcceptor.isUrlOkForAccess(acsUri, check)) {
 				log.debug("SubjectConfirmationData.Recipient={} matches ACWhitelistEntry={}", acsUrl.get(), check);
 				return acsUrl.get();
 			}
 		}
-		log.info("SubjectConfirmationData.Recipient={} does not match rpIssuerId={} or any ACWhitelist={} ACWhitelistNetUrls={}",
+		log.info("SubjectConfirmationData.Recipient={} does not match rpIssuerId={} or any ACWhitelist={}",
 				acsUrl.get(), relyingParty.getId(),
-				CollectionUtil.toLogString(relyingParty.getAcWhitelist().getAcUrls()),
-				CollectionUtil.toLogString(relyingParty.getAcWhitelist().getAcNetUrls()));
+				CollectionUtil.toLogString(relyingParty.getAcWhitelist().getAcUrls()));
 		return relyingParty.getId(); // should fail validation
 	}
 

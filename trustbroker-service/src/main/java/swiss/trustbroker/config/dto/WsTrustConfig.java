@@ -26,6 +26,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.opensaml.soap.util.SOAPConstants;
+import org.opensaml.soap.wssecurity.WSSecurityConstants;
 import swiss.trustbroker.federation.xmlconfig.WsTrustBinding;
 import swiss.trustbroker.util.ApiSupport;
 
@@ -153,14 +155,12 @@ public class WsTrustConfig {
 	private boolean issueRequireTimestamp = true;
 
 	/**
-	 * Require signed SOAP requests for WS-Trust ISSUE.
+	 * Require signed assertion for WS-Trust ISSUE.
 	 * <br/>
 	 * Default: true
 	 * @since 1.13.0
-	 * @deprecated
 	 */
 	@Builder.Default
-	@Deprecated(since = "1.13.0", forRemoval = true)
 	private boolean issueRequireSignedAssertions = true;
 
 	/**
@@ -173,6 +173,15 @@ public class WsTrustConfig {
 	private boolean renewRequireSignedRequests = true;
 
 	/**
+	 * Require signed assertion for WS-Trust RENEW.
+	 * <br/>
+	 * Default: true
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private boolean renewRequireSignedAssertions = true;
+
+	/**
 	 * Sign SOAP responses.
 	 * <br/>
 	 * Default: true
@@ -180,6 +189,31 @@ public class WsTrustConfig {
 	 */
 	@Builder.Default
 	private boolean doSignResponse = true;
+
+	/**
+	 * ID attributes for signature validation.
+	 * <br/>
+	 * Default: "Id" in namespace wss-wssecurity-utility-1.0, names "Id" and "ID"
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private List<AttributeProperties> signatureIdAttributes = List.of(
+			AttributeProperties.builder().namespaceUri(WSSecurityConstants.WSU_NS).name("Id").build(),
+			AttributeProperties.builder().name("Id").build(),
+			AttributeProperties.builder().name("ID").build());
+
+	/**
+	 * Elements for which signature is accepted.
+	 * <br/>
+	 * Default: "Envelope", "Body" in SOAP 1.1 and SOAP 1.2 namespaces
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private List<AttributeProperties> acceptedSignedElements = List.of(
+			AttributeProperties.builder().namespaceUri(SOAPConstants.SOAP11_NS).name("Envelope").build(),
+			AttributeProperties.builder().namespaceUri(SOAPConstants.SOAP12_NS).name("Envelope").build(),
+			AttributeProperties.builder().namespaceUri(SOAPConstants.SOAP11_NS).name("Body").build(),
+			AttributeProperties.builder().namespaceUri(SOAPConstants.SOAP12_NS).name("Body").build());
 
 	/**
 	 * Lifetime expiration in minutes.

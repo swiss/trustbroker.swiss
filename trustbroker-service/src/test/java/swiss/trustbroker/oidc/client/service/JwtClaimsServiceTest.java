@@ -60,12 +60,15 @@ class JwtClaimsServiceTest {
 		var definitions = jwtClaimsService.mapAndValidateClaimsToAttributes(jwtClaimsSet.getClaims(), cp);
 
 		assertThat(definitions.size(), is(3));
-		assertThat(definitions.get(new Definition(OidcMockTestData.CLAIM_GIVEN_NAME)),
-				is(List.of(OidcMockTestData.GIVEN_NAME)));
-		assertThat(definitions.get(new Definition(OidcMockTestData.CLAIM_FAMILY_NAME)),
-				is(List.of(OidcMockTestData.FAMILY_NAME)));
-		assertThat(definitions.get(new Definition(OidcMockTestData.CLAIM_EMAIL)),
-				is(List.of(OidcMockTestData.EMAIL)));
+		var givenName = new Definition(OidcMockTestData.CLAIM_GIVEN_NAME);
+		givenName.setSource("CP");
+		assertThat(definitions.get(givenName), is(List.of(OidcMockTestData.GIVEN_NAME)));
+		var familyName = new Definition(OidcMockTestData.CLAIM_FAMILY_NAME);
+		familyName.setSource("CP");
+		assertThat(definitions.get(familyName), is(List.of(OidcMockTestData.FAMILY_NAME)));
+		var email = new Definition(OidcMockTestData.CLAIM_EMAIL);
+		email.setSource("CP");
+		assertThat(definitions.get(email), is(List.of(OidcMockTestData.EMAIL)));
 	}
 
 	@Test

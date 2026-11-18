@@ -16,7 +16,8 @@
 package swiss.trustbroker.common.config;
 
 public enum ExternalStores {
-	LDAP;
+	LDAP,
+	REST;
 
 	public static boolean isValid(String store) {
 		if (store == null) return false;

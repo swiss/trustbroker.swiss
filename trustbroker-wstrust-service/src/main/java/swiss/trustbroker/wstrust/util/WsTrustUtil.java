@@ -22,7 +22,6 @@ import java.util.Objects;
 import javax.xml.namespace.QName;
 import javax.xml.transform.dom.DOMSource;
 
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.opensaml.core.xml.util.XMLObjectSupport;
 import org.opensaml.saml.saml2.core.Assertion;
@@ -49,8 +48,6 @@ import org.opensaml.soap.wstrust.TokenType;
 import org.opensaml.soap.wstrust.WSTrustConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 import org.springframework.ws.soap.SoapElement;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -58,8 +55,6 @@ import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.util.WSSConstants;
-import swiss.trustbroker.config.dto.NetworkConfig;
-import swiss.trustbroker.util.WebSupport;
 
 @Slf4j
 public class WsTrustUtil {
@@ -239,15 +234,15 @@ public class WsTrustUtil {
 		var createdOk =
 				(created != null) && (created.getDateTime() != null) && nowWithBeforeTolerance.isAfter(created.getDateTime());
 		if (!createdOk) {
-			log.error("Invalid {}.Created={} in the future now={} notOnOrAfterToleranceSec={}",
-					periodType, (created != null) ? created.getDateTime() : null, now, notOnOrAfterToleranceSec);
+			log.warn("Invalid {}.Created={} in the future now={} notBeforeToleranceSec={}",
+					periodType, (created != null) ? created.getDateTime() : null, now, notBeforeToleranceSec);
 		}
 		var nowWithAfterTolerance = now.minusSeconds(notOnOrAfterToleranceSec + 1); // tolerance is positive
 		var expiresOk =
 				(expires != null) && (expires.getDateTime() != null) && nowWithAfterTolerance.isBefore(expires.getDateTime());
 		if (!expiresOk) {
-			log.error("Invalid {}.Expires={} in the past now={} notBeforeToleranceSec={}",
-					periodType, (expires != null) ? expires.getDateTime() : null, now, notBeforeToleranceSec);
+			log.warn("Invalid {}.Expires={} in the past now={} notOnOrAfterToleranceSec={}",
+					periodType, (expires != null) ? expires.getDateTime() : null, now, notOnOrAfterToleranceSec);
 		}
 		return createdOk && expiresOk;
 	}
@@ -256,54 +251,6 @@ public class WsTrustUtil {
 		var source = soapMessage.getSource();
 		var domSource = (DOMSource) source;
 		return domSource.getNode();
-	}
-
-	public static boolean isNetworkAllowed(List<String> allowedNetworks, boolean enforceClientNetwork,
-			HttpServletRequest request, NetworkConfig network) {
-		if (CollectionUtils.isEmpty(allowedNetworks)) {
-			return true;
-		}
-		if (request == null) {
-			log.error("Missing HttpServletRequest, cannot restrict WS-Trust to allowedNetworks={}", allowedNetworks);
-			return true;
-		}
-		var clientNetwork = WebSupport.getClientNetwork(request, network);
-		if (clientNetwork == null) {
-			log.error("Client network not known, cannot restrict WS-Trust to allowedNetworks={}", allowedNetworks);
-			return true;
-		}
-		var allowedNetwork = allowedNetworks.contains(clientNetwork);
-		if (allowedNetwork) {
-			log.debug("Access to WS-Trust allowed from clientNetwork={} for allowedNetworks={}", clientNetwork, allowedNetworks);
-			return true;
-		}
-		if (enforceClientNetwork) {
-			log.error("Access to WS-Trust blocked from clientNetwork={} for allowedNetworks={}", clientNetwork, allowedNetworks);
-			return false;
-		}
-		log.warn("Access to WS-Trust allowed from clientNetwork={} despite allowedNetworks={}", clientNetwork, allowedNetworks);
-		return true;
-	}
-
-	public static boolean isClientIpAllowed(String clientIpRegex, boolean enforceClientIp, String clientIp) {
-		if (!StringUtils.hasLength(clientIpRegex)) {
-			return true;
-		}
-		if (clientIp == null) {
-			log.error("Missing clientIp, cannot restrict WS-Trust to allowedClientIpRegex={}", clientIpRegex);
-			return true;
-		}
-		var allowedIp = clientIp.matches(clientIpRegex);
-		if (allowedIp) {
-			log.debug("Access to WS-Trust allowed from clientIp={} for allowedClientIpRegex={}", clientIp, clientIpRegex);
-			return true;
-		}
-		if (enforceClientIp) {
-			log.error("Access to WS-Trust blocked from clientIp={} for allowedClientIpRegex={}", clientIp, clientIpRegex);
-			return false;
-		}
-		log.warn("Access to WS-Trust allowed from clientIp={} despite allowedClientIpRegex={}", clientIp, clientIpRegex);
-		return true;
 	}
 
 	public static NameID getNameID(Assertion assertion) {

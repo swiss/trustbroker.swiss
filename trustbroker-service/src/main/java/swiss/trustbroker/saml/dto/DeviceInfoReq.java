@@ -19,7 +19,17 @@ import lombok.Data;
 
 @Data
 public class DeviceInfoReq {
+	/**
+	 * @deprecated Read from StateData, to be removed
+	 */
+	@Deprecated(forRemoval = true, since = "1.16.0")
 	private String cpUrn;
+
+	/**
+	 * @deprecated Read from StateData, to be removed
+	 */
+	@Deprecated(forRemoval = true, since = "1.16.0")
 	private String rpUrn;
+
 	private String id;
 }

@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -487,10 +488,11 @@ class JwtTokenCustomizer implements OAuth2TokenCustomizer<JwtEncodingContext> {
 		if (!isEnabledTokenClaim(IdTokenClaimNames.AUTH_TIME)) {
 			return;
 		}
+		// Spring/Nimbus converts the Date back to an epoch-seconds
 		var authTime = getAuthTimeFromResponse(assertions, issueInstant);
 		if (authTime != null) {
 			long epochSecond = authTime.getEpochSecond();
-			cpResponse.setClaim(IdTokenClaimNames.AUTH_TIME, epochSecond);
+			cpResponse.setClaim(IdTokenClaimNames.AUTH_TIME, new Date(epochSecond * 1000));
 		}
 	}
 

@@ -7,10 +7,11 @@ objectClass: domain
 dc: organization
 
 # Get all data for 1st user from public test ldap service:
-# ldapsearch -x -H ldap://localhost:1389 -b dc=trustbroker,dc=ch '(&(app=*)(|(uid=max1)(adminGlobalId=max1-global-id-2)))'
+# ldapsearch -x -H ldap://localhost:1389 -b dc=trustbroker,dc=ch '(&(adminTechAppName=app1)(|(uid=max1)(adminGlobalId=z-114336)))'
 
 dn: cn=admin,dc=trustbroker,dc=ch
 objectClass: inetOrgPerson
+objectClass: extensibleObject
 uid: admin
 cn: Admin
 sn: Admin
@@ -18,8 +19,10 @@ userPassword: secret
 
 dn: cn=max1-app1,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
+objectClass: extensibleObject
 cn: max1-app1
 uid: max1
+sAMAccountName: max1-app1
 sn: Monde
 givenName: Maxine
 mail: maxine.z-114336@trustbroker.swiss
@@ -32,11 +35,36 @@ adminMemberOf: 100:app1-tester-org100
 adminMemberOf: 200:app1-tester-org200
 adminOrgId: 100
 adminOrgId: 200
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
+objectGUID:: DcHh+mUjeUegbdL6QnE5Pg==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAQIAAA==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAAIAAA==
+userCertificate;binary:: MIIDEzCCAfugAwIBAgIUbNB8RrSZmOLzsiYNLaiI4ga/fLIwDQYJKoZIhvcN
+ AQELBQAwGTEXMBUGA1UEAwwOYmluYXJ5LWV4YW1wbGUwHhcNMjYxMDA5MTMz
+ NDU3WhcNMzYxMDA2MTMzNDU3WjAZMRcwFQYDVQQDDA5iaW5hcnktZXhhbXBs
+ ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKHnRuswdrFkXEXI
+ qma0A3Qc2OinjVEyd8WkH4AfqQ973ZpLJ5LBM+nvOdUdQq1gHIC1QLdjWpmQ
+ 4o+EcFJtA6yZW/m/+qqM4J+3nIhKvOTSMRtrF6xmbjtFuV4TpbCnuYTlrsgQ
+ OTzZqosrGnj+7kRMdnLZT6hwuUx1jsX3cUkejvKDdjCSJngvRbFo/Mj/i1il
+ ciwbdn1H0zy9ZVOaF4oQo35IYAL+riJzFVGo4gWa4NjJlQt3b55Do3zGYgQa
+ Yb3R5ynK8YiIDkc4ppkRcZGH2P9EQYB7J6805QGekFVlJhApkVkU8eac6t3g
+ E2Pp+9d3jnum8Xk0EBqazY3ZeQsCAwEAAaNTMFEwHQYDVR0OBBYEFH1mf1cS
+ Mdj+tGpf55kLar9zco/bMB8GA1UdIwQYMBaAFH1mf1cSMdj+tGpf55kLar9z
+ co/bMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAIGs03s/
+ jYNZNkmsWkDDmXUXXimlr6tdAZ9zfr+/0ZdWf/t50tfy9LoKM/dYH3YeGCN1
+ LZwiPosqFRDPSpLiRKreymzx9p5qkNkwW/7q9/08tRqSLZvcleV2ytW6d/0T
+ vJmmPWpppNQawimtlZZqeEZGUGDyXIRO5lGg+sS985e/e+4Xmg3+mHvNLYUj
+ DJUvqGEljkYCcgVvxqwHaK68RsKl3iXf3iy/SzkMGItsU4A1n47BqT0oWZS9
+ UjiHPn2FA7m2BRZ4gcl43j+vH8amXhgdSN7sLhnhxx+SjwHt/vX6jdIyD/Sc
+ 3sLEmkFL5aNAQdcjy87peK86ZVajRSZ6Rpo=
 
 dn: cn=max1-app1-ext,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
+objectClass: extensibleObject
 cn: max1-app1-ext
 uid: max1
+sAMAccountName: max1-app1-ext
 sn: Monde
 givenName: Maxine
 mail: maxine.p-999887@trustbroker.swiss
@@ -49,11 +77,36 @@ adminOrgId: 101
 adminOrgId: 1012
 adminMemberOf: 101:app1-admin-org101
 adminMemberOf: 1012:app1-guest-org1012
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
+objectGUID:: /nyLhpRw5Ea1WaOKyiY7Gg==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAQIAAA==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAAIAAA==
+userCertificate;binary:: MIIDEzCCAfugAwIBAgIUbNB8RrSZmOLzsiYNLaiI4ga/fLIwDQYJKoZIhvcN
+ AQELBQAwGTEXMBUGA1UEAwwOYmluYXJ5LWV4YW1wbGUwHhcNMjYxMDA5MTMz
+ NDU3WhcNMzYxMDA2MTMzNDU3WjAZMRcwFQYDVQQDDA5iaW5hcnktZXhhbXBs
+ ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKHnRuswdrFkXEXI
+ qma0A3Qc2OinjVEyd8WkH4AfqQ973ZpLJ5LBM+nvOdUdQq1gHIC1QLdjWpmQ
+ 4o+EcFJtA6yZW/m/+qqM4J+3nIhKvOTSMRtrF6xmbjtFuV4TpbCnuYTlrsgQ
+ OTzZqosrGnj+7kRMdnLZT6hwuUx1jsX3cUkejvKDdjCSJngvRbFo/Mj/i1il
+ ciwbdn1H0zy9ZVOaF4oQo35IYAL+riJzFVGo4gWa4NjJlQt3b55Do3zGYgQa
+ Yb3R5ynK8YiIDkc4ppkRcZGH2P9EQYB7J6805QGekFVlJhApkVkU8eac6t3g
+ E2Pp+9d3jnum8Xk0EBqazY3ZeQsCAwEAAaNTMFEwHQYDVR0OBBYEFH1mf1cS
+ Mdj+tGpf55kLar9zco/bMB8GA1UdIwQYMBaAFH1mf1cSMdj+tGpf55kLar9z
+ co/bMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAIGs03s/
+ jYNZNkmsWkDDmXUXXimlr6tdAZ9zfr+/0ZdWf/t50tfy9LoKM/dYH3YeGCN1
+ LZwiPosqFRDPSpLiRKreymzx9p5qkNkwW/7q9/08tRqSLZvcleV2ytW6d/0T
+ vJmmPWpppNQawimtlZZqeEZGUGDyXIRO5lGg+sS985e/e+4Xmg3+mHvNLYUj
+ DJUvqGEljkYCcgVvxqwHaK68RsKl3iXf3iy/SzkMGItsU4A1n47BqT0oWZS9
+ UjiHPn2FA7m2BRZ4gcl43j+vH8amXhgdSN7sLhnhxx+SjwHt/vX6jdIyD/Sc
+ 3sLEmkFL5aNAQdcjy87peK86ZVajRSZ6Rpo=
 
 dn: cn=max1-app2-ext,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
+objectClass: extensibleObject
 cn: max1-app2-ext
 uid: max1
+sAMAccountName: max1-app2-ext
 sn: Monde
 givenName: Maxine
 mail: maxine.p-999887@trustbroker.swiss
@@ -64,11 +117,15 @@ adminDataRoomId: uid-123
 adminEnv: DEV+TEST
 adminOrgId: 100
 adminMemberOf: 100:app2-admin-org100
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
 
 dn: cn=max2-app1-ext,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
+objectClass: extensibleObject
 cn: max2-app1-ext
 uid: max2
+sAMAccountName: max2-app1-ext
 sn: Monde
 givenName: Maxine
 mail: maxine.p-999887@trustbroker.swiss
@@ -78,11 +135,36 @@ adminExtId: C123
 adminDataRoomId: uid-123
 adminEnv: DEV+TEST
 adminOrgId: 200
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
+objectGUID:: QV1ErgAmhkqVUhL5TS3RtQ==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAQIAAA==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAAIAAA==
+userCertificate;binary:: MIIDEzCCAfugAwIBAgIUbNB8RrSZmOLzsiYNLaiI4ga/fLIwDQYJKoZIhvcN
+ AQELBQAwGTEXMBUGA1UEAwwOYmluYXJ5LWV4YW1wbGUwHhcNMjYxMDA5MTMz
+ NDU3WhcNMzYxMDA2MTMzNDU3WjAZMRcwFQYDVQQDDA5iaW5hcnktZXhhbXBs
+ ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKHnRuswdrFkXEXI
+ qma0A3Qc2OinjVEyd8WkH4AfqQ973ZpLJ5LBM+nvOdUdQq1gHIC1QLdjWpmQ
+ 4o+EcFJtA6yZW/m/+qqM4J+3nIhKvOTSMRtrF6xmbjtFuV4TpbCnuYTlrsgQ
+ OTzZqosrGnj+7kRMdnLZT6hwuUx1jsX3cUkejvKDdjCSJngvRbFo/Mj/i1il
+ ciwbdn1H0zy9ZVOaF4oQo35IYAL+riJzFVGo4gWa4NjJlQt3b55Do3zGYgQa
+ Yb3R5ynK8YiIDkc4ppkRcZGH2P9EQYB7J6805QGekFVlJhApkVkU8eac6t3g
+ E2Pp+9d3jnum8Xk0EBqazY3ZeQsCAwEAAaNTMFEwHQYDVR0OBBYEFH1mf1cS
+ Mdj+tGpf55kLar9zco/bMB8GA1UdIwQYMBaAFH1mf1cSMdj+tGpf55kLar9z
+ co/bMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAIGs03s/
+ jYNZNkmsWkDDmXUXXimlr6tdAZ9zfr+/0ZdWf/t50tfy9LoKM/dYH3YeGCN1
+ LZwiPosqFRDPSpLiRKreymzx9p5qkNkwW/7q9/08tRqSLZvcleV2ytW6d/0T
+ vJmmPWpppNQawimtlZZqeEZGUGDyXIRO5lGg+sS985e/e+4Xmg3+mHvNLYUj
+ DJUvqGEljkYCcgVvxqwHaK68RsKl3iXf3iy/SzkMGItsU4A1n47BqT0oWZS9
+ UjiHPn2FA7m2BRZ4gcl43j+vH8amXhgdSN7sLhnhxx+SjwHt/vX6jdIyD/Sc
+ 3sLEmkFL5aNAQdcjy87peK86ZVajRSZ6Rpo=
 
 # single non-redundant 2nd user with multiple orgs and authorizations
 dn: cn=max2,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
+objectClass: extensibleObject
 uid: max2
+sAMAccountName: max2
 cn: max2
 sn: Muster
 givenName: Max
@@ -96,12 +178,16 @@ adminEnv: DEV+TEST
 adminOrgId: 100
 adminOrgId: 300
 adminMemberOf: 100:app1-admin-org100
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
 
 # no organization for user
 dn: cn=max3-app2-ext,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
+objectClass: extensibleObject
 cn: max3-app2-ext
 uid: max3
+sAMAccountName: max3-app2-ext
 sn: Monde
 givenName: Maxine
 mail: maxine.p-999887@trustbroker.swiss
@@ -110,11 +196,15 @@ adminTechAppName: app2
 adminExtId: C123
 adminDataRoomId: uid-123
 adminEnv: DEV+TEST
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
 
 dn: cn=max4-app2-ext,dc=users,dc=trustbroker,dc=ch
 objectClass: adminTrustAccount
+objectClass: extensibleObject
 cn: max4-app2-ext
 uid: max4
+sAMAccountName: max4-app2-ext
 sn: Monde
 givenName: Maxine
 mail: maxine.p-999887@trustbroker.swiss
@@ -123,10 +213,13 @@ adminTechAppName: app2
 adminExtId: C125
 adminDataRoomId: uid-123
 adminEnv: DEV+TEST
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
 
 dn: cn=org1,dc=organization,dc=trustbroker,dc=ch
 objectClass: top
 objectClass: adminOrganization
+objectClass: extensibleObject
 cn: org1
 adminDataRoomId: uid-123
 adminOrgId: 101
@@ -140,6 +233,7 @@ organizationIdentifier: treenode
 dn: cn=org2,dc=organization,dc=trustbroker,dc=ch
 objectClass: top
 objectClass: adminOrganization
+objectClass: extensibleObject
 cn: org2
 adminDataRoomId: uid-123
 adminOrgId: 1012
@@ -153,6 +247,7 @@ organizationIdentifier: treenode
 dn: cn=org3,dc=organization,dc=trustbroker,dc=ch
 objectClass: top
 objectClass: adminOrganization
+objectClass: extensibleObject
 cn: org3
 adminDataRoomId: uid-123
 adminOrgId: 300
@@ -162,3 +257,37 @@ adminDisplayNameFR: Org300Fr
 adminDisplayNameIT: Org300It
 displayName: Org300
 organizationIdentifier: treenode
+
+# binary AD attribute examples: objectGUID, objectSid, tokenGroups (2 SIDs), userCertificate (DER)
+dn: cn=binary-example,dc=users,dc=trustbroker,dc=ch
+objectClass: adminTrustAccount
+objectClass: extensibleObject
+cn: binary-example
+uid: binary-example
+sAMAccountName: binary-example
+sn: Example
+adminGlobalId: binary-example
+adminTechAppName: app9
+objectGUID:: 4AQlP4lP0xGaDAMF6CwzAQ==
+objectSid:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4B9QMAAA==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAQIAAA==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAAIAAA==
+tokenGroups:: AQEAAQAAAAABAAAA
+userCertificate;binary:: MIIDEzCCAfugAwIBAgIUbNB8RrSZmOLzsiYNLaiI4ga/fLIwDQYJKoZIhvcN
+ AQELBQAwGTEXMBUGA1UEAwwOYmluYXJ5LWV4YW1wbGUwHhcNMjYxMDA5MTMz
+ NDU3WhcNMzYxMDA2MTMzNDU3WjAZMRcwFQYDVQQDDA5iaW5hcnktZXhhbXBs
+ ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKHnRuswdrFkXEXI
+ qma0A3Qc2OinjVEyd8WkH4AfqQ973ZpLJ5LBM+nvOdUdQq1gHIC1QLdjWpmQ
+ 4o+EcFJtA6yZW/m/+qqM4J+3nIhKvOTSMRtrF6xmbjtFuV4TpbCnuYTlrsgQ
+ OTzZqosrGnj+7kRMdnLZT6hwuUx1jsX3cUkejvKDdjCSJngvRbFo/Mj/i1il
+ ciwbdn1H0zy9ZVOaF4oQo35IYAL+riJzFVGo4gWa4NjJlQt3b55Do3zGYgQa
+ Yb3R5ynK8YiIDkc4ppkRcZGH2P9EQYB7J6805QGekFVlJhApkVkU8eac6t3g
+ E2Pp+9d3jnum8Xk0EBqazY3ZeQsCAwEAAaNTMFEwHQYDVR0OBBYEFH1mf1cS
+ Mdj+tGpf55kLar9zco/bMB8GA1UdIwQYMBaAFH1mf1cSMdj+tGpf55kLar9z
+ co/bMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAIGs03s/
+ jYNZNkmsWkDDmXUXXimlr6tdAZ9zfr+/0ZdWf/t50tfy9LoKM/dYH3YeGCN1
+ LZwiPosqFRDPSpLiRKreymzx9p5qkNkwW/7q9/08tRqSLZvcleV2ytW6d/0T
+ vJmmPWpppNQawimtlZZqeEZGUGDyXIRO5lGg+sS985e/e+4Xmg3+mHvNLYUj
+ DJUvqGEljkYCcgVvxqwHaK68RsKl3iXf3iy/SzkMGItsU4A1n47BqT0oWZS9
+ UjiHPn2FA7m2BRZ4gcl43j+vH8amXhgdSN7sLhnhxx+SjwHt/vX6jdIyD/Sc
+ 3sLEmkFL5aNAQdcjy87peK86ZVajRSZ6Rpo=

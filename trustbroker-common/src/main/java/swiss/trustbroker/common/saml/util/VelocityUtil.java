@@ -68,6 +68,11 @@ public class VelocityUtil {
 
 	private VelocityUtil() {}
 
+	/**
+	 * @param velocityContext context for template rendering
+	 * @param contextValues parameters properly encoded for the template (usually HTML encoded unless they are from a trusted
+	 * source (constants, trusted config, but not user input) and do not contain any problematic characters.
+	 */
 	public static <T> void populateVelocityContext(VelocityContext velocityContext, Map<String, T> contextValues) {
 		log.debug("Velocity contextValues={}", contextValues);
 		for (var entry : contextValues.entrySet()) {
@@ -75,6 +80,11 @@ public class VelocityUtil {
 		}
 	}
 
+	/**
+	 * @param velocityTemplate path to the template, see constants in this class
+	 * @param contextValues parameters properly encoded for the template (usually HTML encoded unless they are from a trusted
+	 * source (constants, trusted config, but not user input) and do not contain any problematic characters.
+	 */
 	public static <T> void renderTemplate(
 			VelocityEngine velocityEngine, HttpServletResponse response, String velocityTemplate,
 			Map<String, T> contextValues) {
@@ -83,12 +93,17 @@ public class VelocityUtil {
 		renderTemplate(velocityEngine, response, velocityTemplate, context);
 	}
 
-	// HTTPPostEncoder.postEncode copied, not flushing the stream to allow TX commit.
-	// Using getWriter would have buffered with autoFlush=false, but opensaml flushes explicitly.
-	// v1.13.0:
-	// @Transactional boundary moved to service level separating load/save of SAML/OIDC federation state into own transactions.
-	// This allows also concurrent processing initiated with the same state (but still has a winner on the client).
-	// To make sure no clients receive data too early we also use a catchOutputStream/flushOutputStream on OidcTxFilter.
+	/**
+	 *  HTTPPostEncoder.postEncode copied, not flushing the stream to allow TX commit.
+	 *  Using getWriter would have buffered with autoFlush=false, but OpenSAML flushes explicitly.
+	 *  v1.13.0:
+	 *  <code>@Transactional</code> boundary moved to service level separating load/save of SAML/OIDC federation state into own
+	 *  transactions.
+	 *  This allows also concurrent processing initiated with the same state (but still has a winner on the client).
+	 *  To make sure no clients receive data too early we also use a catchOutputStream/flushOutputStream on OidcTxFilter.
+	 * @param velocityTemplate path to the template, see constants in this class
+	 * @param context context with parameters properly encoded for the template
+	 */
 	public static void renderTemplate(
 			VelocityEngine velocityEngine, HttpServletResponse response, String velocityTemplate,
 			VelocityContext context) {

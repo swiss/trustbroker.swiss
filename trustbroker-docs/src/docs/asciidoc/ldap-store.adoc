@@ -8,7 +8,7 @@ If no claim selection are configured in the IDMQuery for the LDAP Store, all att
 
 Known limitations:
 
-- this plugin can only connect to one LDAP server
+- only username/password authentication is supported for LDAP stores
 
 == Configuration
 
@@ -17,30 +17,22 @@ Known limitations:
 |===
 | Parameter | Comment | Location | Type | Values | Example
 
-| ``spring.ldap.urls``
-| url to connect to the LDAP server
+| ``trustbroker.config.ldap.stores.<name>.url``
+| URL to connect to the LDAP server for a named store
 | application.yml
 | String
 | *
 | ldaps://localhost:636
 
-| ``spring.ldap.base``
-| base DN
-| application.yml
-| String
-| *
-| dc=trustbroker,dc=ch
-
-
-| ``spring.ldap.usename``
-| username used to query the LDAP server
+| ``trustbroker.config.ldap.stores.<name>.authentication.username``
+| Username used to query the LDAP server
 | application.yml
 | String
 | *
 | uid=admin,ou=system
 
-| ``spring.ldap.password``
-| password used to query the LDAP server
+| ``trustbroker.config.ldap.stores.<name>.authentication.password``
+| Password used to query the LDAP server
 | application.yml
 | String
 | *
@@ -52,6 +44,34 @@ Known limitations:
 | Boolean
 | true / false
 | false
+
+| ``trustbroker.config.ldap.stores.<name>.network.backendConnectTimeoutSec``
+| TCP connect timeout for the LDAP connection, in seconds
+| application.yml
+| Integer
+| *
+| 5
+
+| ``trustbroker.config.ldap.stores.<name>.network.backendResponseTimeoutSec``
+| Response timeout for LDAP operations, in seconds
+| application.yml
+| Integer
+| *
+| 10
+
+| ``trustbroker.config.ldap.stores.<name>.pool.enabled``
+| Enables connection pooling for the store (reuses connections instead of opening one per query)
+| application.yml
+| Boolean
+| true / false
+| true
+
+| ``trustbroker.config.ldap.stores.<name>.pool.*``
+| Pool tuning: maxTotalPerKey, maxIdlePerKey, minIdlePerKey, maxWaitSec, testWhileIdle, timeBetweenEvictionRunsSec, minEvictableIdleTimeSec
+| application.yml
+| Integer / Boolean
+| *
+| maxTotalPerKey: 5
 
 
 

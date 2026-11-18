@@ -91,7 +91,7 @@ export default class ClaimsProviderNoticeComponent implements OnInit {
 		);
 	}
 
-	updateCookie(event: MatCheckboxChange) {
+	updateCookie(event: MatCheckboxChange): void {
 		if (event.checked) {
 			this.claimsProviderNoticeService.setCookie(this.idpObject);
 		} else {

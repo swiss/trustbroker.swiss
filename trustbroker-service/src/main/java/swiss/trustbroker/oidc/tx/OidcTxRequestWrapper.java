@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -225,6 +226,18 @@ public class OidcTxRequestWrapper extends HttpServletRequestWrapper {
 
 	public void setSubSession(HttpSession oidcSubSession) {
 		this.oidcSubSession = oidcSubSession;
+	}
+
+	@Override
+	public Locale getLocale() {
+		try {
+			return super.getLocale();
+		}
+		catch (IllegalArgumentException ex) {
+			log.warn("User agent sent too many locales (clientType='{}' language='{}' ex='{}'",
+					getHeader(HttpHeaders.USER_AGENT), getHeader(HttpHeaders.ACCEPT_LANGUAGE), ex.getMessage());
+			return Locale.ENGLISH;
+		}
 	}
 
 }

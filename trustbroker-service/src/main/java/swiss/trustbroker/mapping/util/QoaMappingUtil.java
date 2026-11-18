@@ -54,7 +54,7 @@ public class QoaMappingUtil {
 	@SuppressWarnings("java:S107") // large number of parameters as it's used from static context
 	public static boolean validateContextClass(
 			QoaComparison comparison, List<String> expectedContextClasses, QoaConfig requestQoaConf, // request
-			String actualContextClass, QoaConfig qoaConfig, String issuer,// response
+			String actualContextClass, QoaConfig qoaConfig, String issuer, // response
 			Map<String, Integer> globalMapping, boolean checkOnly) {
 
 		if (CollectionUtils.isEmpty(expectedContextClasses)) {
@@ -126,7 +126,7 @@ public class QoaMappingUtil {
 		}
 
 		var msg = String.format(
-				"Invalid Qoa in request actualCtxClasses=%s expectedCtxClasses=%s comparison=%s issuer=%s confIssuer=%s ",
+				"Invalid Qoa in message actualCtxClasses=%s expectedCtxClasses=%s comparison=%s issuer=%s confIssuer=%s ",
 				actualContextClasses,expectedContextClasses, comparison, reqIssuer, qoaConfig.issuerId());
 		if (enforceQoa(qoaConfig)) {
 			throw new RequestDeniedException(StandardErrorCode.NO_AUTHN_CONTEXT, msg);
@@ -141,12 +141,12 @@ public class QoaMappingUtil {
 	}
 
 	public static boolean enforceQoa(QoaConfig cpQoaConf) {
-		return cpQoaConf.hasConfig() && cpQoaConf.config().enforce();
+		return cpQoaConf.hasConfig() && cpQoaConf.config().getEnforce();
 	}
 
 	public static boolean enforceQoa(QoaConfig rpQoaConf, QoaConfig cpQoaConf) {
-		var cpEnforce = cpQoaConf.hasConfig() && cpQoaConf.config().enforce();
-		var rpEnforce = rpQoaConf.hasConfig() && rpQoaConf.config().enforce();
+		var cpEnforce = cpQoaConf.hasConfig() && cpQoaConf.config().getEnforce();
+		var rpEnforce = rpQoaConf.hasConfig() && rpQoaConf.config().getEnforce();
 		return cpEnforce || rpEnforce;
 	}
 
@@ -212,7 +212,7 @@ public class QoaMappingUtil {
 					configQoa.issuerId(), contextClass);
 			return;
 		}
-		if (configQoa.config().enforce()) {
+		if (configQoa.config().getEnforce()) {
 			throw new RequestDeniedException(StandardErrorCode.NO_AUTHN_CONTEXT,
 					String.format("Missing ctxClass=%s in config (HINT: check application.yaml trustbroker.config.qoa"
 							+ " or the SetupRP.xml) for rpIssuer=%s qoaConf=%s", contextClass, configQoa.issuerId(), configQoa));
@@ -230,10 +230,10 @@ public class QoaMappingUtil {
 			return;
 		}
 
-		var cpEnforce = cpQoaConf.hasConfig() && cpQoaConf.config().enforce();
-		var rpEnforce = rpQoaConf.hasConfig() && rpQoaConf.config().enforce();
+		var cpEnforce = cpQoaConf.hasConfig() && cpQoaConf.config().getEnforce();
+		var rpEnforce = rpQoaConf.hasConfig() && rpQoaConf.config().getEnforce();
 
-		var msg = String.format("Missing Qoa in request cpIssuer=%s, expectedCtxClasses=%s comparison=%s rpIssuer=%S",
+		var msg = String.format("Missing Qoa in message cpIssuer=%s, expectedCtxClasses=%s comparison=%s rpIssuer=%S",
 				cpQoaConf.issuerId(), expectedContextClasses, comparison, rpQoaConf.issuerId());
 		if (cpEnforce || rpEnforce) {
 			throw new RequestDeniedException(StandardErrorCode.NO_AUTHN_CONTEXT, msg);
@@ -249,9 +249,9 @@ public class QoaMappingUtil {
 			return;
 		}
 
-		var cpEnforce = qoaConf.config().enforce();
+		var cpEnforce = qoaConf.config().getEnforce();
 
-		var msg = String.format("Missing Qoa in request issuer=%s, expectedCtxClasses=%s comparison=%s",
+		var msg = String.format("Missing Qoa in message issuer=%s, expectedCtxClasses=%s comparison=%s",
 				qoaConf.issuerId(), expectedContextClasses, comparison);
 		if (cpEnforce) {
 			throw new RequestDeniedException(StandardErrorCode.NO_AUTHN_CONTEXT, msg);
@@ -312,7 +312,7 @@ public class QoaMappingUtil {
 				maxQoa = qoaOrder;
 			}
 		}
-		log.debug("issuer={} returned contextClasses={} with max qoa={}", configQoa.issuerId(), classRefs, maxQoa);
+		log.debug("issuer={} returned contextClasses={} with nearest max qoa={}", configQoa.issuerId(), classRefs, maxQoa);
 		return maxQoa;
 	}
 
@@ -338,7 +338,7 @@ public class QoaMappingUtil {
 					"Missing Qoa in config ctxClass=%s issuer=%s, cannot determine order"
 							+ " (HINT: Check trustbroker.config.qoa or SetupRP.xml/SetupCP.xml defining order)",
 					classRef, configQoa.issuerId());
-			if (configQoa.config().enforce()) {
+			if (configQoa.config().getEnforce()) {
 				throw new RequestDeniedException(StandardErrorCode.NO_AUTHN_CONTEXT, msg);
 			}
 			else {
@@ -349,7 +349,8 @@ public class QoaMappingUtil {
 		return Set.of(level);
 	}
 
-	public static Set<Integer> getQoaOrders(String classRef, QoaConfig inboundQoaConf, QoaConfig outboundQoaConf, Map<String, Integer> globalMapping) {
+	public static Set<Integer> getQoaOrders(String classRef, QoaConfig inboundQoaConf, QoaConfig outboundQoaConf,
+			Map<String, Integer> globalMapping) {
 		var configAcClasses = getConfigAcClasses(classRef, outboundQoaConf.config(), true);
 		if (!configAcClasses.isEmpty()) {
 			var result = configAcClasses.stream()
@@ -381,7 +382,8 @@ public class QoaMappingUtil {
 					"Missing Qoa in config ctxClass=%s inboundIssuer=%s outboundIssuer=%s, cannot determine order"
 							+ " (HINT: Check trustbroker.config.qoa or SetupRP.xml/SetupCP.xml defining Qoa model)",
 					classRef, inboundQoaConf.issuerId(), outboundQoaConf.issuerId());
-			if ((inboundQoaConf.config() != null && inboundQoaConf.config().enforce()) || (outboundQoaConf.config() != null && outboundQoaConf.config().enforce())) {
+			if ((inboundQoaConf.config() != null && inboundQoaConf.config().getEnforce())
+					|| (outboundQoaConf.config() != null && outboundQoaConf.config().getEnforce())) {
 				throw new RequestDeniedException(StandardErrorCode.NO_AUTHN_CONTEXT, msg);
 			}
 			else {

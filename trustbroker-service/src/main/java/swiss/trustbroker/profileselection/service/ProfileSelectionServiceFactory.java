@@ -17,39 +17,51 @@ package swiss.trustbroker.profileselection.service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import swiss.trustbroker.api.profileselection.service.ProfileSelectionService;
 import swiss.trustbroker.common.config.ExternalStores;
 import swiss.trustbroker.common.exception.TechnicalException;
+import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.federation.xmlconfig.IdmLookup;
 import swiss.trustbroker.federation.xmlconfig.IdmQuery;
 
 @Component
+@Slf4j
 public class ProfileSelectionServiceFactory {
 
 	private final Map<String, ProfileSelectionService> services;
 
-	private final ProfileSelectionService defaultService;
+	private final TrustBrokerProperties trustBrokerProperties;
 
 	@Autowired
-	public ProfileSelectionServiceFactory(Map<String, ProfileSelectionService> services, ProfileSelectionService defaultService) {
+	public ProfileSelectionServiceFactory(Map<String, ProfileSelectionService> services,
+			TrustBrokerProperties trustBrokerProperties) {
 		this.services = services;
-		this.defaultService = defaultService;
+		this.trustBrokerProperties = trustBrokerProperties;
 	}
 
 	public ProfileSelectionService getProfileSelectionService(String type) {
 		if (services.size() == 1) {
 			return services.values().iterator().next();
 		}
-		if (type == null || type.isBlank()) {
-			return defaultService;
+		if (StringUtils.isEmpty(type)) {
+			type = trustBrokerProperties.getProfileSelection().getDefaultService();
+			if (type == null) {
+				type = "";
+			}
+			log.debug("Using default profile selection service of type={}", type);
 		}
-		return Optional.ofNullable(services.get(type.toLowerCase()))
-					   .orElseThrow(() -> new TechnicalException(
-							   String.format("Unknown profile selection service type=%s", type)));
+		var service = services.get(type.toLowerCase());
+		if (service == null) {
+			throw new TechnicalException(String.format("Unknown profile selection service type=%s availableTypes=%s -"
+					+ "configure trustbroker.config.profileselection.defaultService or specify the store type in IdmLookup.",
+					type, services.keySet()));
+		}
+		return service;
 	}
 
 	public ProfileSelectionService getProfileSelectionService(IdmLookup idmLookup) {

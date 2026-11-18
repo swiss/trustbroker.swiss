@@ -46,6 +46,7 @@ import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.AuthnStatement;
 import org.opensaml.saml.saml2.core.Conditions;
 import org.opensaml.saml.saml2.core.Issuer;
+import org.opensaml.saml.saml2.core.LogoutRequest;
 import org.opensaml.saml.saml2.core.RequestAbstractType;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.StatusCode;
@@ -70,6 +71,7 @@ import swiss.trustbroker.common.saml.util.SamlUtil;
 import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.common.util.StringUtil;
 import swiss.trustbroker.common.util.UrlAcceptor;
+import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
@@ -81,6 +83,7 @@ import swiss.trustbroker.mapping.dto.QoaConfig;
 import swiss.trustbroker.mapping.util.QoaMappingUtil;
 import swiss.trustbroker.saml.dto.ResponseData;
 import swiss.trustbroker.sessioncache.dto.StateData;
+import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.PropertyUtil;
 import swiss.trustbroker.util.WebSupport;
 
@@ -110,8 +113,6 @@ public class AssertionValidator {
 		private String expectedAudience;
 
 		private String expectedRpId;
-
-		private String expectedAssertionId;
 
 		private String expectedRelayState;
 
@@ -170,6 +171,7 @@ public class AssertionValidator {
 		validateAuthnRequestIssuer(authnRequest);
 		validateAuthnRequestIssueInstant(authnRequest, now, properties);
 		validateAuthnRequestConditions(authnRequest, now, null, false, properties, securityPolicies);
+		validateAuthnRequestDestination(authnRequest, signatureContext.getBinding(), properties, securityPolicies);
 
 		var issuer = authnRequest.getIssuer() != null ? authnRequest.getIssuer().getValue() : "NONE";
 		var qoaConfig = new QoaConfig(rpQoa, issuer);
@@ -224,6 +226,7 @@ public class AssertionValidator {
 		validateResponseStatus(expectedValues.expectSuccess, response);
 		validateResponseId(response);
 		validateResponseIssueInstant(response, now, properties);
+		validateResponseDestination(response, properties, claimsParty.getSecurityPolicies());
 
 		// session dependent checks (stateful)
 		validateRelayState(expectedValues.expectedRelayState, responseData.getRelayState(), properties, response);
@@ -352,7 +355,7 @@ public class AssertionValidator {
 		validateAssertionId(assertion);
 		validateAssertionIssueInstant(assertion, now, expectedValues.renew, properties, securityPolicies);
 		validateAssertionIssuer(assertion, expectedValues.expectedIssuer, properties);
-		var bearerSubjectConfirmation = validateAssertionSubject(assertion, now, expectedValues.expectedAssertionId, false,
+		var bearerSubjectConfirmation = validateAssertionSubject(assertion, now, expectedValues.expectedRequestId, false,
 				expectedValues.renew, expectedValues.expectedRecipient, properties);
 		validateAssertionConditions(assertion, now, expectedValues.expectedAudience, expectedValues.renew,
 				properties, securityPolicies, bearerSubjectConfirmation);
@@ -412,6 +415,25 @@ public class AssertionValidator {
 			throw new RequestDeniedException(String.format(
 					"Issuer missing: %s", OpenSamlUtil.samlObjectToString(authnRequest)));
 		}
+	}
+
+	static void validateAuthnRequestDestination(AuthnRequest authnRequest, SamlBinding binding,
+			TrustBrokerProperties properties, SecurityPolicies securityPolicies) {
+		if (!requireAuthnRequestDestination(properties, securityPolicies)) {
+			log.debug("AuthnRequest.Destination validation disabled");
+			return;
+		}
+		String actualDestination = authnRequest.getDestination();
+		String perimeterUrl = properties.getPerimeterUrl();
+		Set<String> expectedDestinations = binding == SamlBinding.WS_FED ?
+				ApiSupport.getWsFedEntryPoints(perimeterUrl) : ApiSupport.getSamlEntryPoints(perimeterUrl);
+		validateDestination("AuthnRequest", actualDestination, expectedDestinations);
+	}
+
+	static boolean requireAuthnRequestDestination(TrustBrokerProperties properties, SecurityPolicies securityPolicies) {
+		return PropertyUtil.evaluateProperty(securityPolicies,
+				SecurityPolicies::getRequireAuthnRequestDestination,
+				() -> properties.getSecurity().isRequireAuthnRequestDestination());
 	}
 
 	static void validateResponseIssuer(Response response, String expectedIssuer, TrustBrokerProperties properties) {
@@ -995,6 +1017,56 @@ public class AssertionValidator {
 		}
 	}
 
+	static void validateResponseDestination(Response response, TrustBrokerProperties properties, SecurityPolicies securityPolicies) {
+		if (!requireResponseDestination(properties, securityPolicies)) {
+			log.debug("Response.Destination validation disabled");
+			return;
+		}
+		String actualDestination = response.getDestination();
+		Set<String> expectedDestinations = ApiSupport.getSamlEntryPoints(properties.getPerimeterUrl());
+		validateDestination("Response", actualDestination, expectedDestinations);
+	}
+
+	static boolean requireResponseDestination(TrustBrokerProperties properties, SecurityPolicies securityPolicies) {
+		return PropertyUtil.evaluateProperty(securityPolicies,
+				SecurityPolicies::getRequireResponseDestination,
+				() -> properties.getSecurity().isRequireResponseDestination());
+	}
+
+	public static void validateLogoutRequestDestination(LogoutRequest logoutRequest, SamlBinding binding,
+			TrustBrokerProperties properties, SecurityPolicies securityPolicies) {
+		if (!requireLogoutRequestDestination(properties, securityPolicies)) {
+			log.debug("LogoutRequest.Destination validation disabled");
+			return;
+		}
+		String actualDestination = logoutRequest.getDestination();
+		String perimeterUrl = properties.getPerimeterUrl();
+		Set<String> expectedDestinations = binding == SamlBinding.WS_FED ?
+				ApiSupport.getWsFedEntryPoints(perimeterUrl) : ApiSupport.getSamlEntryPoints(perimeterUrl);
+		validateDestination("LogoutRequest", actualDestination, expectedDestinations);
+	}
+
+	static boolean requireLogoutRequestDestination(TrustBrokerProperties properties, SecurityPolicies securityPolicies) {
+		return PropertyUtil.evaluateProperty(securityPolicies,
+				SecurityPolicies::getRequireLogoutRequestDestination,
+				() -> properties.getSecurity().isRequireLogoutRequestDestination());
+	}
+
+	private static void validateDestination(String elementName, String actualDestination, Set<String> expectedDestinations) {
+		if (actualDestination == null) {
+			log.debug("{}.Destination is missing, but optional (SAML 2.0 Protocol spec RequestAbstractType/StatusResponseType)",
+					elementName);
+			return;
+		}
+		// strip query string as it is not relevant for the check that Destination validation is meant to provide
+		String destination = WebUtil.splitQueryParameters(actualDestination, false).getLeft();
+		if (!expectedDestinations.contains(destination)) {
+			throw new RequestDeniedException(String.format(
+					"%s.Destination invalid actualDestination='%s' expectedDestinations='%s' (query strings are ignored)",
+					elementName, actualDestination, expectedDestinations));
+		}
+	}
+
 	static void checkIssueInstantTimeRange(XMLObject xmlObject, Instant nowOffsetDateTime,
 			long notBeforeToleranceSec, long notOnOrAfterToleranceSec, Instant incomingIssueInstant) {
 		var duration = Duration.between(incomingIssueInstant, nowOffsetDateTime);
@@ -1049,7 +1121,7 @@ public class AssertionValidator {
 				acWhiteList = AcWhitelist.builder().build();
 			}
 			final var incomingUrl = new URI(accessedUrl);
-			for (var check : acWhiteList.getAcNetUrls()) {
+			for (var check : acWhiteList.getAcUrls()) {
 				if (UrlAcceptor.isUrlOkForAccess(incomingUrl, check)) {
 					log.debug("Network access from url={} matches ACWhitelistEntry={}", accessedUrl, acWhiteList.getAcUrls());
 					return;
@@ -1146,28 +1218,32 @@ public class AssertionValidator {
 		else {
 			log.info("trustbroker.config.security.validateSubjectConfirmationTimestamp=false: Timestamps not checked!!!");
 		}
-		if (properties.getSecurity().isValidateSubjectConfirmationRecipient()) {
-			var subjectConfRecipient = subjectConfirmationData.getRecipient();
-			if (expectedRecipient != null && subjectConfRecipient != null && !expectedRecipient.equals(subjectConfRecipient)) {
+		var subjectConfRecipient = subjectConfirmationData.getRecipient();
+		if (expectedRecipient != null && subjectConfRecipient != null && !expectedRecipient.equals(subjectConfRecipient)) {
+			if (properties.getSecurity().isValidateSubjectConfirmationRecipient()) {
 				throw new RequestDeniedException(String.format(
 						"Invalid SubjectConfirmation, expectedRecipient='%s' not matching recipient='%s' in: %s",
 						expectedRecipient, subjectConfirmationData.getRecipient(), OpenSamlUtil.samlObjectToString(xmlObject)));
 			}
-		}
-		else if (subjectConfirmationData.getRecipient() != null) {
-			log.debug("trustbroker.config.security.validateSubjectConfirmationRecipient=false: Recipient not checked.");
+			else {
+				log.warn("trustbroker.config.security.validateSubjectConfirmationRecipient=false: "
+						+ "Mismatch of Recipient=\"{}\" and expectedRecipient=\"{}\" ignored",
+						subjectConfRecipient, expectedRecipient);
+			}
 		}
 		// Subject can be bound to assertion via ID
-		if (properties.getSecurity().isValidateSubjectConfirmationInResponseTo()) {
-			var subjectConfInRespTo = subjectConfirmationData.getInResponseTo();
-			if (expectedRequestId != null && subjectConfInRespTo != null && !expectedRequestId.equals(subjectConfInRespTo)) {
+		var subjectConfInRespTo = subjectConfirmationData.getInResponseTo();
+		if (expectedRequestId != null && subjectConfInRespTo != null && !expectedRequestId.equals(subjectConfInRespTo)) {
+			if (properties.getSecurity().isValidateSubjectConfirmationInResponseTo()) {
 				throw new RequestDeniedException(String.format(
 						"Invalid SubjectConfirmation, requestId='%s' not matching subjectConfInRespTo='%s' in: %s",
 						expectedRequestId, subjectConfInRespTo, OpenSamlUtil.samlObjectToString(xmlObject)));
 			}
-		}
-		else if (subjectConfirmationData.getInResponseTo() != null) {
-			log.info("trustbroker.config.security.validateSubjectConfirmationInResponseTo=false: InResponseTo not checked!!!");
+			else {
+				log.warn("trustbroker.config.security.validateSubjectConfirmationInResponseTo=false: "
+								+ "Mismatch of InResponseTo=\"{}\" and expectedRequestId=\"{}\" ignored",
+						subjectConfInRespTo, expectedRequestId);
+			}
 		}
 	}
 

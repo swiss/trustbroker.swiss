@@ -238,7 +238,7 @@ class HrdControllerTest {
 		var cp = buildCp();
 		mockLookups(rp, cp, ssoStateData, stateDataByAuthnReq, ssoStateValid);
 		var cookies = buildCookies();
-		doReturn(ssoStateData).when(ssoService).findValidStateFromCookies(rp, cp, cookies);
+		doReturn(ssoStateData).when(ssoService).findValidStateFromCookies(rp, cp, stateDataByAuthnReq, cookies);
 		doReturn(Optional.of(stateDataByAuthnReq)).when(stateCacheService).findBySpIdResilient(AUTHN_REQUEST_ID,
 				HrdController.class.getSimpleName());
 		if (ssoStateData.isPresent()) {

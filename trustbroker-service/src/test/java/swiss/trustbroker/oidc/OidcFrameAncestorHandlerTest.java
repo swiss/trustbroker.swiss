@@ -33,6 +33,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.oidc.session.HttpExchangeSupport;
@@ -129,7 +130,7 @@ class OidcFrameAncestorHandlerTest {
 
 	private static AcWhitelist givenAcWhitelist(List<String> acUrls, List<String> frameAncestors) {
 		return AcWhitelist.builder()
-						  .acUrls(acUrls)
+						  .acUrls(AcUrl.asAcUrlList(acUrls))
 						  .frameAncestors(frameAncestors)
 						  .build();
 	}

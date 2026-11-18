@@ -51,7 +51,6 @@ import org.opensaml.saml.saml2.core.LogoutResponse;
 import org.opensaml.saml.saml2.core.NameID;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.HtmlUtils;
 import swiss.trustbroker.api.saml.dto.DestinationType;
 import swiss.trustbroker.audit.dto.OidcAuditData;
 import swiss.trustbroker.audit.service.AuditService;
@@ -179,7 +178,7 @@ public class SsoService {
 
 	static final String VELOCITY_PARAM_XTB_SLO_NOTIFICATIONS = "XTBSloNotifications";
 
-	static final String VELOCITY_PARAM_XTB_SLO_SERIALIZE_NOFICIATIONS = "XTBSloSerializeNotifications";
+	static final String VELOCITY_PARAM_XTB_SLO_SERIALIZE_NOTIFICATIONS = "XTBSloSerializeNotifications";
 
 	static final String VELOCITY_PARAM_XTB_SLO_MAX_WAIT = "XTBSloMaxWaitMillis";
 
@@ -261,13 +260,15 @@ public class SsoService {
 		return generateCookie(params, sessionId, sessionLifeTime, isSecureTransport, sameSite);
 	}
 
-	public static String getSsoSubject(StateData stateData, ClaimsParty claimsParty) {
+	private static String getSsoSubject(StateData stateData, ClaimsParty claimsParty) {
 		var ssoState = stateData.getSsoState();
 		if (ssoState != null && ssoState.getSubject() != null) {
 			return ssoState.getSubject();
 		}
 		var ssSubjectFromCpResponse = getSsoSubjectFromCpConfigOrState(stateData, claimsParty);
-		if (ssSubjectFromCpResponse != null) return ssSubjectFromCpResponse;
+		if (ssSubjectFromCpResponse != null) {
+			return ssSubjectFromCpResponse;
+		}
 		return stateData.getSubjectNameId();
 	}
 
@@ -291,6 +292,18 @@ public class SsoService {
 									  .findFirst().orElse(null);
 		}
 		return null;
+	}
+
+	private static String getSsoSubjectFromIdpState(ClaimsParty claimsParty, StateData idpStateData) {
+		var subjectNameId = getSsoSubject(idpStateData, claimsParty);
+		if (subjectNameId == null && idpStateData.getCpResponse() != null) {
+			subjectNameId = idpStateData.getCpResponse().getNameId();
+		}
+		if (subjectNameId == null) {
+			log.info("Could not determine subjectNameId from state={} and cpIssuerId={}",
+					idpStateData.getId(), claimsParty.getId());
+		}
+		return subjectNameId;
 	}
 
 	String calculateCookieSameSiteFlag(SsoState ssoState) {
@@ -319,12 +332,10 @@ public class SsoService {
 		return extractOnlyStateFromMap(validStates, filter);
 	}
 
-	public Optional<StateData> findValidStateFromCookies(RelyingParty relyingParty, ClaimsParty claimsParty, Cookie[] cookies) {
-		var nameParams = getCookieSsoGroupName(relyingParty, claimsParty);
-		return findValidStateFromCookiesAndRelyingParty(nameParams, cookies, null);
-	}
-
-	// using implicit SSO group of RP
+	/**
+	 * @return Find first matching cookie using implicit SSO group of RP.
+	 * If no cookie found, then check for regular SSO group of RP.
+	 */
 	public Optional<StateData> findValidStateFromCookiesAndRelyingParty(RelyingParty relyingParty, Cookie[] cookies) {
 		var nameParams = getCookieImplicitSsoGroupName(relyingParty);
 		var result = findValidStateFromCookiesAndRelyingParty(nameParams, cookies, filterStates(relyingParty));
@@ -336,8 +347,14 @@ public class SsoService {
 		return result;
 	}
 
+	/**
+	 * @return First matching cookie for RP's group and CP (if provided) and (non-SSO) login state's subject. If no
+	 * subject is present (login state has not performed authentication), then only the RP's group and CP are used to find a
+	 * matching cookie. This is the normal case, the login state has a subject if the AuthnRequest forces re-authentication.
+	 */
 	public Optional<StateData> findValidStateFromCookies(RelyingParty relyingParty, ClaimsParty claimsParty,
-			String subjectNameId, Cookie[] cookies) {
+			StateData idpStateData, Cookie[] cookies) {
+		var subjectNameId = getSsoSubjectFromIdpState(claimsParty, idpStateData);
 		var nameParams = getCookieSsoGroupName(relyingParty, claimsParty, subjectNameId);
 		return findValidStateFromCookiesAndRelyingParty(nameParams, cookies, null);
 	}
@@ -462,7 +479,13 @@ public class SsoService {
 			return SsoSessionOperation.IGNORE;
 		}
 		ensureAuthnReqOrImplicitSsoState(stateDataByAuthnReq);
-		return validAuthnRequestForSso(claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq, false);
+		var ret = validAuthnRequestForSso(claimsParty, relyingParty, ssoStateData, stateDataByAuthnReq, false);
+		// any SSO joining participant needs to act on the same cpIssuer as the initiating participant
+		if (ret.skipCpAuthentication && !ssoStateData.getCpIssuer().equals(stateDataByAuthnReq.getCpIssuer())) {
+			stateDataByAuthnReq.setIssuer(ssoStateData.getCpIssuer());
+			stateCacheService.save(stateDataByAuthnReq, "skipCpAuthentication");
+		}
+		return ret;
 	}
 
 	private boolean validStateForSso(StateData ssoStateData) {
@@ -1119,10 +1142,11 @@ public class SsoService {
 
 		var ssoSessionId = stateData.getSsoSessionId();
 		var oidcSessionId = stateData.getOidcSessionId();
+		var rpTxnId = stateData.getRpTxnId();
 		log.info("SSO established for cpIssuer={} cpResponseIssuer={} cpSessionId={} ssoSessionId={} on rpParticipant={} "
-						+ "rpSession={} oidcSession={}",
+						+ "rpSession={} oidcSession={} rpTxnId={}",
 				cpIssuerId, stateData.getCpResponse().getIssuer(), stateData.getId(), ssoSessionId, rpIssuerId,
-				stateData.getSpStateData().getId(), oidcSessionId);
+				stateData.getSpStateData().getId(), oidcSessionId, rpTxnId);
 	}
 
 	static void updateSubjectNameIdInSession(StateData ssoStateData, ClaimsParty claimsParty) {
@@ -1252,18 +1276,12 @@ public class SsoService {
 		var relyingParty = relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(
 				stateDataByAuthnReq.getRpIssuer(), stateDataByAuthnReq.getRpReferer());
 		var claimsParty = relyingPartySetupService.getClaimsProviderSetupByIssuerId(claimsPartyId);
-		var ssoState = findValidStateFromCookies(relyingParty, claimsParty.orElse(null), cookies);
+		var ssoState = findValidStateFromCookies(relyingParty, claimsParty.orElse(null), stateDataByAuthnReq, cookies);
 		if (ssoState.isEmpty()) {
 			return SsoSessionOperation.IGNORE;
 		}
 		var ssoStateData = ssoState.get();
-		var ret = skipCpAuthentication(claimsParty.orElse(null), relyingParty, stateDataByAuthnReq, ssoStateData);
-		// any SSO joining participant needs to act on the same cpIssuer as the initiating participant
-		if (ret.skipCpAuthentication) {
-			stateDataByAuthnReq.setIssuer(ssoStateData.getCpIssuer());
-			stateCacheService.save(stateDataByAuthnReq, "prepareRedirectForDeviceInfoAfterHrd");
-		}
-		return ret;
+		return skipCpAuthentication(claimsParty.orElse(null), relyingParty, stateDataByAuthnReq, ssoStateData);
 	}
 
 	Function<Map<String, StateData>, Optional<StateData>> filterStates(RelyingParty relyingParty) {
@@ -1357,6 +1375,7 @@ public class SsoService {
 		ssoStateData.setForceAuthn(stateDataByAuthnReq.getForceAuthn());
 		ssoStateData.setSignedAuthnRequest(stateDataByAuthnReq.getSignedAuthnRequest());
 		ssoStateData.setLastConversationId(stateDataByAuthnReq.getLastConversationId());
+		ssoStateData.setTxnId(stateDataByAuthnReq.getTxnId());
 		TraceSupport.switchToConversation(stateDataByAuthnReq.getLastConversationId()); // detach along traceId
 
 		if (stateDataByAuthnReq.getId().equals(ssoStateData.getId())) {
@@ -1544,9 +1563,9 @@ public class SsoService {
 				// encoded data needed for REDIRECT signature
 				result.setSamlLogoutRequest(SamlIoUtil.encodeSamlRedirectData(logoutRequest));
 				result.setSamlHttpMethod(HttpMethod.GET.name());
-				var split = WebUtil.splitQueryParameters(url, true);
+				var split = WebUtil.splitQueryParameters(url, false);
 				url = split.getKey();
-				result.setEncodedQueryParameters(split.getValue());
+				result.setQueryParameters(split.getValue());
 			}
 			if (relyingParty.requireSignedLogoutNotificationRequest()) {
 				setSignatureParameters(relyingParty, sloResponse, url, logoutRequest, result);
@@ -1563,8 +1582,9 @@ public class SsoService {
 				log.error("OIDC client for rpIssuerId={} requires sid parameter, but OIDC session ID is missing - sloResponse={}",
 						relyingParty.getId(), sloResponse);
 			}
+			// no parameter splitting for OIDC as this is just rendered as a GET link (through an iframe)
 		}
-		result.setEncodedUrl(HTMLEncoder.encodeForHTMLAttribute(url));
+		result.setUrl(url);
 		return result;
 	}
 
@@ -1701,9 +1721,9 @@ public class SsoService {
 				var calculatedSloUrl = calculateSloUrlForAcsUrl(relyingParty, response.getUrl(), acsUrl, response.matchAcUrl());
 				if (calculatedSloUrl != null) {
 					notification = new SloNotification(response);
-					var split = WebUtil.splitQueryParameters(calculatedSloUrl, true);
-					notification.setEncodedUrl(HTMLEncoder.encodeForHTMLAttribute(split.getKey()));
-					notification.setEncodedQueryParameters(split.getValue());
+					var split = WebUtil.splitQueryParameters(calculatedSloUrl, false);
+					notification.setUrl(split.getKey());
+					notification.setQueryParameters(split.getValue());
 				}
 			}
 			responseMap.put(response, notification);
@@ -1841,7 +1861,7 @@ public class SsoService {
 		var serializeLogoutNotifications = relyingParty.getSso().serializeNotifications();
 		log.debug("Velocity parameters: maxWait={} minWait={} count={} oidcRedirectUrl={} serializeLogoutNotifications={}",
 				maxWait, minWait, notifications.size(), oidcRedirectUrl, serializeLogoutNotifications);
-		velocityParams.put(VELOCITY_PARAM_XTB_SLO_SERIALIZE_NOFICIATIONS, serializeLogoutNotifications);
+		velocityParams.put(VELOCITY_PARAM_XTB_SLO_SERIALIZE_NOTIFICATIONS, serializeLogoutNotifications);
 		velocityParams.put(VELOCITY_PARAM_XTB_SLO_MAX_WAIT, maxWait);
 		velocityParams.put(VELOCITY_PARAM_XTB_SLO_MIN_WAIT, minWait);
 		velocityParams.put(VELOCITY_PARAM_XTB_SLO_WAIT_FOR_COUNT, notifications.size());
@@ -1855,11 +1875,6 @@ public class SsoService {
 			}
 		}
 		if (redirectUrl != null) {
-			// getRedirectResponse returns encoded URL - unescape to split (relative or absolute URL must contain /)
-			if (redirectUrl.indexOf('/') == -1) {
-				log.debug("HTMl-unescaping redirectUrl=\"{}\"", redirectUrl);
-				redirectUrl = HtmlUtils.htmlUnescape(redirectUrl);
-			}
 			var split = WebUtil.splitQueryParameters(redirectUrl, true);
 			velocityParams.put(VelocityUtil.VELOCITY_PARAM_XTB_HTTP_METHOD, HttpMethod.GET.name());
 			velocityParams.put(VelocityUtil.VELOCITY_PARAM_ACTION, HTMLEncoder.encodeForHTMLAttribute(split.getKey()));
@@ -1885,8 +1900,8 @@ public class SsoService {
 		return responseMap.entrySet()
 				.stream()
 				.filter(entry -> entry.getKey().getMode().isResponse()
-						&& entry.getValue() != null && entry.getValue().getEncodedUrl() != null)
-				.map(entry -> entry.getValue().getEncodedUrl())
+						&& entry.getValue() != null && entry.getValue().getUrl() != null)
+				.map(entry -> entry.getValue().getUrl())
 				.findFirst();
 	}
 

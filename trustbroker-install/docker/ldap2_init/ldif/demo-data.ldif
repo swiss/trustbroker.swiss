@@ -1,0 +1,172 @@
+dn: dc=users,dc=trustbroker2,dc=ch
+objectClass: domain
+dc: users
+
+dn: dc=organization,dc=trustbroker2,dc=ch
+objectClass: domain
+dc: organization
+
+# Get all data for a user from this ldap:
+# ldapsearch -x -H ldap://localhost:1390 -b dc=trustbroker2,dc=ch '(&(adminTechAppName=ldap2-app1)(uid=ldap2-alice1))'
+
+dn: cn=admin,dc=trustbroker2,dc=ch
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+uid: admin
+cn: Admin
+sn: Admin
+userPassword: secret
+
+# User with two applications and two organizations
+dn: cn=alice1-app1,dc=users,dc=trustbroker2,dc=ch
+objectClass: adminTrustAccount
+objectClass: extensibleObject
+cn: alice1-app1
+uid: ldap2-alice1
+sAMAccountName: alice1-app1
+sn: ldap2-Weber
+givenName: ldap2-Alice
+mail: ldap2-alice.weber-a-500001@trustbroker2.ch
+adminGlobalId: ldap2-a-500001
+adminTechAppName: ldap2-app1
+adminExtId: ldap2-A900
+adminDataRoomId: ldap2-uid-900
+adminEnv: ldap2-DEV+TEST
+adminOrgId: ldap2-900
+adminOrgId: ldap2-901
+adminMemberOf: ldap2-900:app1-admin-org900
+adminMemberOf: ldap2-901:app1-user-org901
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
+objectGUID:: 4AQlP4lP0xGaDAMF6CwzAQ==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAQIAAA==
+tokenGroups:: AQUAAAAAAAUVAAAAx/f+13x3VciUWs4BAAIAAA==
+tokenGroups:: AQEAAQAAAAABAAAA
+userCertificate;binary:: MIIDEzCCAfugAwIBAgIUbNB8RrSZmOLzsiYNLaiI4ga/fLIwDQYJKoZIhvcN
+ AQELBQAwGTEXMBUGA1UEAwwOYmluYXJ5LWV4YW1wbGUwHhcNMjYxMDA5MTMz
+ NDU3WhcNMzYxMDA2MTMzNDU3WjAZMRcwFQYDVQQDDA5iaW5hcnktZXhhbXBs
+ ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKHnRuswdrFkXEXI
+ qma0A3Qc2OinjVEyd8WkH4AfqQ973ZpLJ5LBM+nvOdUdQq1gHIC1QLdjWpmQ
+ 4o+EcFJtA6yZW/m/+qqM4J+3nIhKvOTSMRtrF6xmbjtFuV4TpbCnuYTlrsgQ
+ OTzZqosrGnj+7kRMdnLZT6hwuUx1jsX3cUkejvKDdjCSJngvRbFo/Mj/i1il
+ ciwbdn1H0zy9ZVOaF4oQo35IYAL+riJzFVGo4gWa4NjJlQt3b55Do3zGYgQa
+ Yb3R5ynK8YiIDkc4ppkRcZGH2P9EQYB7J6805QGekFVlJhApkVkU8eac6t3g
+ E2Pp+9d3jnum8Xk0EBqazY3ZeQsCAwEAAaNTMFEwHQYDVR0OBBYEFH1mf1cS
+ Mdj+tGpf55kLar9zco/bMB8GA1UdIwQYMBaAFH1mf1cSMdj+tGpf55kLar9z
+ co/bMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAIGs03s/
+ jYNZNkmsWkDDmXUXXimlr6tdAZ9zfr+/0ZdWf/t50tfy9LoKM/dYH3YeGCN1
+ LZwiPosqFRDPSpLiRKreymzx9p5qkNkwW/7q9/08tRqSLZvcleV2ytW6d/0T
+ vJmmPWpppNQawimtlZZqeEZGUGDyXIRO5lGg+sS985e/e+4Xmg3+mHvNLYUj
+ DJUvqGEljkYCcgVvxqwHaK68RsKl3iXf3iy/SzkMGItsU4A1n47BqT0oWZS9
+ UjiHPn2FA7m2BRZ4gcl43j+vH8amXhgdSN7sLhnhxx+SjwHt/vX6jdIyD/Sc
+ 3sLEmkFL5aNAQdcjy87peK86ZVajRSZ6Rpo=
+
+dn: cn=alice1-app2,dc=users,dc=trustbroker2,dc=ch
+objectClass: adminTrustAccount
+objectClass: extensibleObject
+cn: alice1-app2
+uid: ldap2-alice1
+sAMAccountName: alice1-app2
+sn: ldap2-Weber
+givenName: ldap2-Alice
+mail: ldap2-alice.weber-a-500001@trustbroker2.ch
+adminGlobalId: ldap2-a-500001
+adminTechAppName: ldap2-app2
+adminExtId: ldap2-A900
+adminDataRoomId: ldap2-uid-900
+adminEnv: ldap2-DEV+TEST
+adminOrgId: ldap2-902
+adminMemberOf: ldap2-902:app2-user-org902
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
+
+# Single user in a different org
+dn: cn=bob1-app1,dc=users,dc=trustbroker2,dc=ch
+objectClass: adminTrustAccount
+objectClass: extensibleObject
+cn: bob1-app1
+uid: ldap2-bob1
+sAMAccountName: bob1-app1
+sn: ldap2-Dupont
+givenName: ldap2-Bob
+mail: ldap2-bob.dupont-b-500002@trustbroker2.ch
+adminGlobalId: ldap2-b-500002
+adminTechAppName: ldap2-app1
+adminExtId: ldap2-A901
+adminDataRoomId: ldap2-uid-901
+adminEnv: ldap2-DEV+TEST
+adminOrgId: ldap2-903
+adminMemberOf: ldap2-903:app1-guest-org903
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
+
+# User without organization (edge case)
+dn: cn=carol1-app2,dc=users,dc=trustbroker2,dc=ch
+objectClass: adminTrustAccount
+objectClass: extensibleObject
+cn: carol1-app2
+uid: ldap2-carol1
+sAMAccountName: carol1-app2
+sn: ldap2-Rossi
+givenName: ldap2-Carol
+mail: ldap2-carol.rossi-c-500003@trustbroker2.ch
+adminGlobalId: ldap2-c-500003
+adminTechAppName: ldap2-app2
+adminExtId: ldap2-A902
+adminDataRoomId: ldap2-uid-902
+adminEnv: ldap2-DEV+TEST
+objectBinaryTest:: QRlC
+objectSid:: AQUAAAAAAAUVAAAA6AMAANAHAAC4CwAAGQAAAA==
+
+dn: cn=org900,dc=organization,dc=trustbroker2,dc=ch
+objectClass: top
+objectClass: adminOrganization
+cn: org900
+adminDataRoomId: ldap2-uid-900
+adminOrgId: ldap2-900
+adminDisplayNameDE: ldap2-Org900De
+adminDisplayNameEN: ldap2-Org900En
+adminDisplayNameFR: ldap2-Org900Fr
+adminDisplayNameIT: ldap2-Org900It
+displayName: ldap2-Org900
+organizationIdentifier: ldap2-treenode
+
+dn: cn=org901,dc=organization,dc=trustbroker2,dc=ch
+objectClass: top
+objectClass: adminOrganization
+cn: org901
+adminDataRoomId: ldap2-uid-900
+adminOrgId: ldap2-901
+adminDisplayNameDE: ldap2-Org901De
+adminDisplayNameEN: ldap2-Org901En
+adminDisplayNameFR: ldap2-Org901Fr
+adminDisplayNameIT: ldap2-Org901It
+displayName: ldap2-Org901
+organizationIdentifier: ldap2-treenode
+
+dn: cn=org902,dc=organization,dc=trustbroker2,dc=ch
+objectClass: top
+objectClass: adminOrganization
+cn: org902
+adminDataRoomId: ldap2-uid-900
+adminOrgId: ldap2-902
+adminDisplayNameDE: ldap2-Org902De
+adminDisplayNameEN: ldap2-Org902En
+adminDisplayNameFR: ldap2-Org902Fr
+adminDisplayNameIT: ldap2-Org902It
+displayName: ldap2-Org902
+organizationIdentifier: ldap2-treenode
+
+dn: cn=org903,dc=organization,dc=trustbroker2,dc=ch
+objectClass: top
+objectClass: adminOrganization
+cn: org903
+adminDataRoomId: ldap2-uid-901
+adminOrgId: ldap2-903
+adminDisplayNameDE: ldap2-Org903De
+adminDisplayNameEN: ldap2-Org903En
+adminDisplayNameFR: ldap2-Org903Fr
+adminDisplayNameIT: ldap2-Org903It
+displayName: ldap2-Org903
+organizationIdentifier: ldap2-treenode
+

@@ -16,6 +16,7 @@
 package swiss.trustbroker.common.exception;
 
 import java.io.IOException;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +62,16 @@ public class ExceptionUtil {
 		}
 		else {
 			throw constructor.apply(message);
+		}
+	}
+
+	public static void logOrThrow(String message, Throwable cause, boolean tryOnly,
+			BiFunction<String, Throwable, TrustBrokerException> constructor) {
+		if (tryOnly) {
+			log.error(message, cause);
+		}
+		else {
+			throw constructor.apply(message, cause);
 		}
 	}
 }

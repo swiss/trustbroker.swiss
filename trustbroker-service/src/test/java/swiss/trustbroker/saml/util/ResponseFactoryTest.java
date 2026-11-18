@@ -131,7 +131,7 @@ class ResponseFactoryTest extends SamlTestBase {
 
 	@BeforeAll
 	@SuppressWarnings("java:S5786")
-	public static void setup() {
+	static void setUp() {
 		SamlTestBase.setup();
 		new CoreAttributeInitializer().init();
 

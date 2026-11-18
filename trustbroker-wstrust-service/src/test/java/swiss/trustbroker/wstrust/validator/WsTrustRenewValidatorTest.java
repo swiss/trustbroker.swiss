@@ -271,6 +271,7 @@ class WsTrustRenewValidatorTest {
 	private RelyingParty givenRelyingParty() {
 		var trustCredentials = SamlTestBase.dummyCredentials(SamlTestBase.X509_RSAENC_P12);
 		var wsTrust = new WsTrust();
+		wsTrust.setEnabled(true);
 		wsTrust.setSupportedBindings(List.of(WsTrustBinding.RENEW));
 		return RelyingParty.builder()
 						   .id(WsTrustTestUtil.RP_ISSUER_ID)

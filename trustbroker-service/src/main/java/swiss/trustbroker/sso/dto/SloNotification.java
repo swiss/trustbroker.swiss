@@ -15,11 +15,13 @@
 
 package swiss.trustbroker.sso.dto;
 
+import java.util.Collections;
 import java.util.List;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.Pair;
+import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.federation.xmlconfig.SloResponse;
 
 /**
@@ -31,9 +33,9 @@ public class SloNotification {
 
 	private final SloResponse slo;
 
-	private String encodedUrl;
+	private String url;
 
-	private List<Pair<String, String>> encodedQueryParameters;
+	private List<Pair<String, String>> queryParameters;
 
 	private String samlLogoutRequest;
 
@@ -44,5 +46,26 @@ public class SloNotification {
 	private String samlRedirectSignatureAlgorithm;
 
 	private String samlHttpMethod;
+
+	public String getEncodedSloUrl() {
+		return WebUtil.htmlEncodeValue(slo.getUrl());
+	}
+
+	public String getEncodedUrl() {
+		return WebUtil.htmlEncodeValue(url);
+	}
+
+	public String getDoubleEncodedUrl() {
+		return WebUtil.doubleHtmlEncodeValue(url);
+	}
+
+	public List<Pair<String, String>> getDoubleEncodedQueryParameters() {
+		if (queryParameters == null) {
+			return Collections.emptyList();
+		}
+		return queryParameters.stream()
+				.map(p -> Pair.of(WebUtil.doubleHtmlEncodeValue(p.getLeft()), WebUtil.doubleHtmlEncodeValue(p.getRight())))
+				.toList();
+	}
 
 }

@@ -49,6 +49,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.authentication.JwtClientAssertionAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationValidator;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeAuthenticationProvider;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration;
 import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderMetadataClaimNames;
@@ -156,6 +157,8 @@ public class OidcServerConfiguration {
 
 		// mandatory /token endpoint
 		authServerConfigurer.tokenEndpoint(tokenEndpoint -> tokenEndpoint
+				.authenticationProviders(authenticationProviders -> authenticationProviders.removeIf(
+						authenticationProvider -> authenticationProvider instanceof OAuth2TokenExchangeAuthenticationProvider))
 				.authenticationProvider(new CustomOAuth2TokenExchangeAuthenticationProvider(registeredClientRepository,
 						customOAuth2AuthorizationService, oidcMetadataCacheService, relyingPartyDefinitions, trustBrokerProperties,
 						relyingPartyService, relyingPartySetupService, qoaMappingService, tokenGenerator))
@@ -234,10 +237,10 @@ public class OidcServerConfiguration {
 		return jwtClientAssertionAuthenticationProvider;
 	}
 
-	private static Consumer<List<AuthenticationProvider>> configureAuthorizationProviderChain() {
+	private Consumer<List<AuthenticationProvider>> configureAuthorizationProviderChain() {
 		return authenticationProviders -> authenticationProviders.forEach(authenticationProvider -> {
 			if (authenticationProvider instanceof OAuth2AuthorizationCodeRequestAuthenticationProvider oauth2Provider) {
-				var authenticationValidator = new CustomRedirectUriValidator()
+				var authenticationValidator = new CustomRedirectUriValidator(relyingPartyDefinitions, trustBrokerProperties)
 						.andThen(OAuth2AuthorizationCodeRequestAuthenticationValidator.DEFAULT_SCOPE_VALIDATOR);
 				oauth2Provider.setAuthenticationValidator(authenticationValidator);
 			}

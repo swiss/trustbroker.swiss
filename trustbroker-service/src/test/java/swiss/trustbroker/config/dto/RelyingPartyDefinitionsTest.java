@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.AccessRequest;
 import swiss.trustbroker.federation.xmlconfig.AuthorizedApplication;
@@ -66,7 +67,7 @@ class RelyingPartyDefinitionsTest {
 	void updateAcWhitelistFromOidcClients() {
 		var acs1 = "https://localhost:4443/acs";
 		var acs2 = "http://localhost:8080/url";
-		var acUrls = List.of(acs1, acs2);
+		List<AcUrl> acUrls = List.of(AcUrl.of(acs1), AcUrl.of(acs2));
 		var acWhitelist = AcWhitelist.builder().acUrls(acUrls).build();
 		var app1 = "firstApp";
 		var app2 = "otherApp";
@@ -78,7 +79,7 @@ class RelyingPartyDefinitionsTest {
 		properties.setPerimeterUrl(perimeterUrl);
 		RelyingPartyDefinitions.updateAcWhitelistFromOidcClients(relyingParty, properties);
 		assertThat(relyingParty.getAcWhitelist().getAcUrls(),
-				containsInAnyOrder(acs1, acs2, perimeterUrl + app1, perimeterUrl + app2));
+				containsInAnyOrder(AcUrl.of(acs1), AcUrl.of(acs2), AcUrl.of(perimeterUrl + app1), AcUrl.of(perimeterUrl + app2)));
 	}
 
 	@Test

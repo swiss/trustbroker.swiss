@@ -61,6 +61,7 @@ import org.opensaml.saml.saml2.core.RequestAbstractType;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.Status;
 import org.opensaml.saml.saml2.core.StatusCode;
+import org.opensaml.saml.saml2.core.SubjectConfirmationData;
 import org.opensaml.xmlsec.signature.Signature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -239,7 +240,8 @@ class AppControllerTest {
 		sso.setEnabled(true);
 		when(trustBrokerProperties.getSso()).thenReturn(sso);
 		when(trustBrokerProperties.getGui()).thenReturn(new GuiProperties());
-		when(trustBrokerProperties.getSaml()).thenReturn(new SamlProperties());
+		var samlProperties = SamlProperties.builder().enabled(true).build();
+		when(trustBrokerProperties.getSaml()).thenReturn(samlProperties);
 		when(trustBrokerProperties.getOidc()).thenReturn(new OidcProperties());
 		SecurityPolicies securityPolicies = new SecurityPolicies();
 		securityPolicies.setValidateXmlSchema(true);
@@ -366,6 +368,7 @@ class AppControllerTest {
 		mockRequestConfiguration();
 		var relyingParty = getRelyingParty(ServiceSamlTestUtil.AUTHN_REQUEST_ISSUER_ID);
 		relyingParty.setSaml(Saml.builder()
+								 .enabled(true)
 								 .artifactBinding(ArtifactBinding.builder().inboundMode(ArtifactBindingMode.REQUIRED).build())
 								 .build());
 		when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(eq(relyingParty.getId()), any())).thenReturn(relyingParty);
@@ -437,6 +440,7 @@ class AppControllerTest {
 		doReturn(Optional.of(stateData)).when(ssoService).findValidStateFromCookies(
 				argThat(rp -> rp.getId().equals(rpIssuer)),
 				argThat(cp -> cp.getId().equals(cpIssuer)),
+				any(),
 				any());
 		doReturn(op).when(ssoService).skipCpAuthentication(
 				argThat(cp -> cp.getId().equals(cpIssuer)),
@@ -955,12 +959,15 @@ class AppControllerTest {
 		authnResponse.setInResponseTo(ServiceSamlTestUtil.CP_AUTHN_REQUEST_ID);
 
 		Instant newNotOnOrAfter = Instant.now().plus(60, ChronoUnit.MINUTES);
-		authnResponse.getAssertions().getFirst().getConditions().setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().getFirst().getConditions().setNotBefore(Instant.now());
-		authnResponse.getAssertions().getFirst().getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData()
-				.setNotOnOrAfter(newNotOnOrAfter);
-		authnResponse.getAssertions().getFirst().getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
-		authnResponse.getAssertions().getFirst().setIssueInstant(Instant.now());
+		Assertion responseAssertion = authnResponse.getAssertions().getFirst();
+		responseAssertion.getConditions().setNotOnOrAfter(newNotOnOrAfter);
+		responseAssertion.getConditions().setNotBefore(Instant.now());
+		SubjectConfirmationData subjectConfirmationData =
+				responseAssertion.getSubject().getSubjectConfirmations().getFirst().getSubjectConfirmationData();
+		subjectConfirmationData.setNotOnOrAfter(newNotOnOrAfter);
+		subjectConfirmationData.setInResponseTo(ServiceSamlTestUtil.CP_AUTHN_REQUEST_ID);
+		responseAssertion.getAuthnStatements().getFirst().setAuthnInstant(Instant.now());
+		responseAssertion.setIssueInstant(Instant.now());
 
 		Assertion assertion = resetAssertionSignature(authnResponse);
 
@@ -1027,6 +1034,7 @@ class AppControllerTest {
 		when(trustBrokerProperties.getSecurity()).thenReturn(ServiceSamlTestUtil.givenEnabledSecurity());
 		when(trustBrokerProperties.getIssuer()).thenReturn("http://test.trustbroker.swiss");
 		when(trustBrokerProperties.getQoa()).thenReturn(givenQoaConfig());
+		when(trustBrokerProperties.getPerimeterUrl()).thenReturn("http://localhost:8080");
 	}
 
 	private QualityOfAuthenticationConfig givenQoaConfig() {

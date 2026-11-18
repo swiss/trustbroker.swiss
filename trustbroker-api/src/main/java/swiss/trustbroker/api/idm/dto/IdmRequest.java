@@ -32,6 +32,16 @@ public interface IdmRequest {
 	String getName();
 
 	/**
+	 * @return Connection service name to select from configured LDAP stores or REST services.
+	 *         If not specified, falls back to {@link #getStore()}.
+	 *         Examples: "ldap1", "rest_service", etc.
+	 * @since 1.16.0
+	 */
+	default String getConnection() {
+		return null;
+	}
+
+	/**
 	 * @return The name of the IDM store this request is targeting.
 	 */
 	String getStore();
@@ -65,4 +75,11 @@ public interface IdmRequest {
 	// callback
 
 	String getUserStatusPolicy();
+
+	/**
+	 * @return Optional query control name controlling how a query participates in the lookup flow.
+	 */
+	default String getQueryControl() {
+		return null;
+	}
 }

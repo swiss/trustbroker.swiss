@@ -75,7 +75,7 @@ public class WsFedUtil {
 
 	public static WsFedAction getRequiredAction(HttpServletRequest request) {
 		var action = getAction(request);
-		if (!action.isPresent()) {
+		if (action.isEmpty()) {
 			throw new RequestDeniedException(String.format("Missing or invalid WS-Fed action=%s", request.getParameter(ACTION)));
 		}
 		return action.get();

@@ -23,8 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -58,6 +56,7 @@ import org.opensaml.saml.saml2.core.AuthnRequest;
 import org.opensaml.saml.saml2.core.AuthnStatement;
 import org.opensaml.saml.saml2.core.Conditions;
 import org.opensaml.saml.saml2.core.Issuer;
+import org.opensaml.saml.saml2.core.LogoutRequest;
 import org.opensaml.saml.saml2.core.NameID;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.Status;
@@ -68,6 +67,7 @@ import org.opensaml.saml.saml2.core.SubjectConfirmationData;
 import org.opensaml.security.credential.Credential;
 import org.opensaml.xmlsec.signature.support.SignatureConstants;
 import org.slf4j.LoggerFactory;
+import swiss.trustbroker.common.dto.AcceptedUrlFormat;
 import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.saml.dto.SamlBinding;
 import swiss.trustbroker.common.saml.dto.SignatureContext;
@@ -84,6 +84,7 @@ import swiss.trustbroker.config.dto.ArtifactResolution;
 import swiss.trustbroker.config.dto.SamlProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.federation.xmlconfig.AcClass;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.Qoa;
@@ -92,6 +93,7 @@ import swiss.trustbroker.federation.xmlconfig.SecurityPolicies;
 import swiss.trustbroker.mapping.dto.QoaConfig;
 import swiss.trustbroker.test.saml.util.SamlTestBase;
 import swiss.trustbroker.test.util.MemoryAppender;
+import swiss.trustbroker.util.ApiSupport;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.STRICT_STUBS)
@@ -351,27 +353,48 @@ class AssertionValidatorTest {
 					null, properties));
 	}
 
-	@Test
-	void validateSubjectConfirmationNotSameRequestIdTest() {
+	@ParameterizedTest
+	@CsvSource(value = {"true", "false"})
+	void validateSubjectConfirmationNotSameRequestIdTest(boolean validateEnabled) {
 		var expectedRequestId = "123";
 		var actualRequestId = "4343";
 		var assertion = givenAssertionWithSubjectConfirmation(actualRequestId, SecurityChecks.BEARER_SUBJECT_CONFIRMATION);
+		properties.getSecurity().setValidateSubjectConfirmationInResponseTo(validateEnabled);
 		var now = Instant.now();
-		assertThrows(RequestDeniedException.class, () ->
-			AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, null, properties)
-		);
+		if (validateEnabled) {
+			assertThrows(RequestDeniedException.class, () ->
+					AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, null, properties)
+			);
+		}
+		else {
+			assertDoesNotThrow(() ->
+					AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, null, properties)
+			);
+			assertLog("trustbroker.config.security.validateSubjectConfirmationInResponseTo=false", Level.WARN);
+		}
 	}
 
-	@Test
-	void validateSubjectConfirmationNotSameRecipientTest() {
+	@ParameterizedTest
+	@CsvSource(value = {"true", "false"})
+	void validateSubjectConfirmationNotSameRecipientTest(boolean validateEnabled) {
 		var expectedRequestId = "123";
 		var expectedRecipient = "rpOther";
 		var assertion = givenAssertionWithSubjectConfirmation(expectedRequestId, SecurityChecks.BEARER_SUBJECT_CONFIRMATION);
+		properties.getSecurity().setValidateSubjectConfirmationRecipient(validateEnabled);
 		var now = Instant.now();
-		assertThrows(RequestDeniedException.class, () ->
-			AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false, expectedRecipient,
-					properties)
-		);
+		if (validateEnabled) {
+			assertThrows(RequestDeniedException.class, () ->
+					AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false,
+							expectedRecipient, properties)
+			);
+		}
+		else {
+			assertDoesNotThrow(() ->
+					AssertionValidator.validateAssertionSubject(assertion, now, expectedRequestId, true, false,
+							expectedRecipient, properties)
+			);
+			assertLog("trustbroker.config.security.validateSubjectConfirmationRecipient=false", Level.WARN);
+		}
 	}
 
 	@ParameterizedTest
@@ -546,6 +569,14 @@ class AssertionValidatorTest {
 			"http://http.host.port.check/path,true", // check /* match on path /
 			"http://http.host.port.check:80/,true", // ignore default port
 			"http://http.host.port.check:1443/,false", // check non-default port
+			"http://path.regex,false", // path regex does not match missing /
+			"http://path.regex/,true", // path regex
+			"http://path.regex:80/any/?query=any,true", // path regex with default port matching
+			"http://any.full.regex,true", // full regex
+			"http://sub.full.regex/any/?query=any,true", // full regex
+			"http://sub.full.regex:80/any,false", // full regex does not have default port matching
+			"http://path.regex/any/?query=any,true", // path regex
+			"http://path.regex,false", // missing trailing slash not matched by regex
 			"http://https.path.check:443/allowed/,false", // check the protocol again
 			"https://https.path.check:443/allowed,false", // path not matched (trailing /)
 			"https://https.path.check:443/allowed/,true", // path matched exactly and default port is checked
@@ -561,7 +592,7 @@ class AssertionValidatorTest {
 			assertTrue(expectedResult, "URL " + networkUrl + " wrongly matches " + acWhiteList);
 		}
 		catch (RequestDeniedException ex) {
-			assertFalse(expectedResult, "URL " + networkUrl + " wrongöy did not match " + acWhiteList
+			assertFalse(expectedResult, "URL " + networkUrl + " wrongly did not match " + acWhiteList
 					+ " resulting in public exception '" + ex.getMessage()
 					+ "' and internal exception '" + ex.getInternalMessage() + "'");
 		}
@@ -756,6 +787,234 @@ class AssertionValidatorTest {
 		);
 	}
 
+	@ParameterizedTest
+	@CsvSource(value = {
+			"true, true," + ApiSupport.SAML_API + ", false",
+			"true, true, /wrong/path, true",
+			"true, true, , true",
+			"false, false, /wrong/path, false",
+			"null, false, /wrong/path, false"
+	}, nullValues = "null")
+	void validateAuthnRequestDestinationRequireFlagTest(Boolean rpRequire, boolean propsRequire, String path, boolean expectThrow) {
+		var authnRequest = givenSignedAuthnRequest();
+
+		authnRequest.setDestination(TEST_ISSUER + path);
+		properties.setPerimeterUrl(TEST_ISSUER);
+
+		var secPol = SecurityPolicies.builder().requireAuthnRequestDestination(rpRequire).build();
+		properties.getSecurity().setRequireAuthnRequestDestination(propsRequire);
+
+		if (expectThrow) {
+			assertThrows(RequestDeniedException.class, () ->
+				AssertionValidator.validateAuthnRequestDestination(authnRequest, SamlBinding.POST, properties, secPol)
+			);
+		}
+		else {
+			assertDoesNotThrow(() ->
+				AssertionValidator.validateAuthnRequestDestination(authnRequest, SamlBinding.POST, properties, secPol)
+			);
+		}
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			ApiSupport.SAML_API + ",POST",
+			ApiSupport.ADFS_ENTRY_URL + ",SOAP",
+			ApiSupport.ADFS_ENTRY_URL_TRAILING_SLASH + ",REDIRECT",
+			ApiSupport.XTB_LEGACY_ENTRY_URL + ",ARTIFACT",
+			ApiSupport.WSFED_API + ",WS_FED"
+	})
+	void validateAuthnRequestDestinationValidTest(String path, SamlBinding binding) {
+		var authnRequest = givenSignedAuthnRequest();
+		authnRequest.setDestination(TEST_ISSUER + path);
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateAuthnRequestDestination(authnRequest, binding, properties, null)
+		);
+	}
+
+	@Test
+	void validateAuthnRequestDestinationValidWithQueryTest() {
+		var authnRequest = givenSignedAuthnRequest();
+		authnRequest.setDestination(TEST_ISSUER + ApiSupport.ADFS_ENTRY_URL + "?type=guest&hrd_hint=urn:idp:OTHER");
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateAuthnRequestDestination(authnRequest, SamlBinding.POST, properties, null)
+		);
+	}
+
+	@Test
+	void validateAuthnRequestDestinationEmptyTest() {
+		var authnRequest = givenSignedAuthnRequest();
+		authnRequest.setDestination("");
+		AssertionValidator.validateAuthnRequestDestination(authnRequest, SamlBinding.POST, properties, null);
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			"/wrong/path,POST",
+			ApiSupport.SAML_API + ",WS_FED",
+			ApiSupport.WSFED_API + ",REDIRECT"
+	})
+	void validateAuthnRequestWrongDestinationTest(String path, SamlBinding binding) {
+		var authnRequest = givenSignedAuthnRequest();
+		authnRequest.setDestination(TEST_ISSUER + path);
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateAuthnRequestDestination(authnRequest, binding, properties, null)
+		);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"true, true," + ApiSupport.SAML_API + ", false",
+			"true, true, /wrong/path, true",
+			"true, true, , true",
+			"false, false, /wrong/path, false",
+			"null, false, /wrong/path, false"
+	}, nullValues = "null")
+	void validateResponseDestinationRequireFlagTest(Boolean cpRequire, boolean propsRequire, String path, boolean expectThrow) {
+		var response = givenResponseWithAssertion();
+
+		response.setDestination(TEST_ISSUER + path);
+		properties.setPerimeterUrl(TEST_ISSUER);
+
+		var secPol = SecurityPolicies.builder().requireResponseDestination(cpRequire).build();
+		properties.getSecurity().setRequireResponseDestination(propsRequire);
+
+		if (expectThrow) {
+			assertThrows(RequestDeniedException.class, () ->
+				AssertionValidator.validateResponseDestination(response, properties, secPol)
+			);
+		}
+		else {
+			assertDoesNotThrow(() ->
+				AssertionValidator.validateResponseDestination(response, properties, secPol)
+			);
+		}
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			ApiSupport.SAML_API,
+			ApiSupport.ADFS_ENTRY_URL,
+			ApiSupport.ADFS_ENTRY_URL_TRAILING_SLASH,
+			ApiSupport.XTB_LEGACY_ENTRY_URL
+	})
+	void validateResponseDestinationValidTest(String path) {
+		var response = givenResponseWithAssertion();
+		response.setDestination(TEST_ISSUER + path);
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateResponseDestination(response, properties, null)
+		);
+	}
+
+	@Test
+	void validateResponseDestinationValidWithQueryTest() {
+		var response = givenResponseWithAssertion();
+		response.setDestination(TEST_ISSUER + ApiSupport.ADFS_ENTRY_URL + "?type=guest&hrd_hint=urn:idp:OTHER");
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertDoesNotThrow(() ->
+			AssertionValidator.validateResponseDestination(response, properties, null)
+		);
+	}
+
+	@Test
+	void validateResponseDestinationEmptyTest() {
+		var response = givenResponseWithAssertion();
+		response.setDestination("");
+		AssertionValidator.validateResponseDestination(response, properties, null);
+	}
+
+	@Test
+	void validateResponseWrongDestinationTest() {
+		var response = givenResponseWithAssertion();
+		response.setDestination(TEST_ISSUER + "/wrong/path");
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertThrows(RequestDeniedException.class, () ->
+			AssertionValidator.validateResponseDestination(response, properties, null)
+		);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"true, true," + ApiSupport.SAML_API + ", false",
+			"true, true, , true",
+			"true, true, /wrong/path, true",
+			"false, false, /wrong/path, false",
+			"null, false, /wrong/path, false"
+	}, nullValues = "null")
+	void validateLogoutRequestDestinationRequireFlagTest(Boolean rpRequire, boolean propsRequire, String path, boolean expectThrow) {
+		var logoutRequest = givenSignedLogoutRequest();
+
+		logoutRequest.setDestination(TEST_ISSUER + path);
+		properties.setPerimeterUrl(TEST_ISSUER);
+
+		var secPol = SecurityPolicies.builder().requireLogoutRequestDestination(rpRequire).build();
+		properties.getSecurity().setRequireLogoutRequestDestination(propsRequire);
+
+		if (expectThrow) {
+			assertThrows(RequestDeniedException.class, () ->
+					AssertionValidator.validateLogoutRequestDestination(logoutRequest, SamlBinding.POST, properties, secPol)
+			);
+		}
+		else {
+			assertDoesNotThrow(() ->
+					AssertionValidator.validateLogoutRequestDestination(logoutRequest, SamlBinding.POST, properties, secPol)
+			);
+		}
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			ApiSupport.SAML_API + ",REDIRECT",
+			ApiSupport.ADFS_ENTRY_URL + ",POST",
+			ApiSupport.ADFS_ENTRY_URL_TRAILING_SLASH + ",ARTIFACT",
+			ApiSupport.XTB_LEGACY_ENTRY_URL + ",SOAP",
+			ApiSupport.WSFED_API + ",WS_FED"
+	})
+	void validateLogoutRequestDestinationValidTest(String path, SamlBinding binding) {
+		var logoutRequest = givenSignedLogoutRequest();
+		logoutRequest.setDestination(TEST_ISSUER + path);
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertDoesNotThrow(() ->
+				AssertionValidator.validateLogoutRequestDestination(logoutRequest, binding, properties, null)
+		);
+	}
+
+	@Test
+	void validateLogoutRequestDestinationValidWithQueryTest() {
+		var logoutRequest = givenSignedLogoutRequest();
+		logoutRequest.setDestination(TEST_ISSUER + ApiSupport.ADFS_ENTRY_URL + "?type=guest&hrd_hint=urn:idp:OTHER");
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertDoesNotThrow(() ->
+				AssertionValidator.validateLogoutRequestDestination(logoutRequest, SamlBinding.POST, properties, null)
+		);
+	}
+
+	@Test
+	void validateLogoutRequestDestinationEmptyTest() {
+		var logoutRequest = givenSignedLogoutRequest();
+		logoutRequest.setDestination("");
+		AssertionValidator.validateLogoutRequestDestination(logoutRequest, SamlBinding.POST, properties, null);
+	}
+
+	@ParameterizedTest
+	@CsvSource({
+			"/wrong/path,ARTIFACT",
+			ApiSupport.SAML_API + ",WS_FED",
+			ApiSupport.WSFED_API + ",POST"
+	})
+	void validateLogoutRequestWrongDestinationTest(String path, SamlBinding binding) {
+		var logoutRequest = givenSignedLogoutRequest();
+		logoutRequest.setDestination(TEST_ISSUER + path);
+		properties.setPerimeterUrl(TEST_ISSUER);
+		assertThrows(RequestDeniedException.class, () ->
+				AssertionValidator.validateLogoutRequestDestination(logoutRequest, binding, properties, null)
+		);
+	}
+
 	@Test
 	void validateAssertionWrongSignerTest() {
 		var expectedRequestId = "req123";
@@ -763,11 +1022,9 @@ class AssertionValidatorTest {
 		var now = Instant.now();
 		var credentials = SamlTestBase.dummyInvalidCredential();
 		var allowedSignatureAlgorithms = givenSignatureAlgorithms();
-		var expectedAssertionId = assertion.getID();
 		var expectedValues = AssertionValidator.ExpectedAssertionValues
 				.builder()
 				.expectedRequestId(expectedRequestId)
-				.expectedAssertionId(expectedAssertionId)
 				.build();
 		assertThrows(RequestDeniedException.class, () -> AssertionValidator.validateAssertion(assertion, now,
 					credentials, allowedSignatureAlgorithms, properties, null, null,  expectedValues));
@@ -1050,22 +1307,70 @@ class AssertionValidatorTest {
 		assertThat(AssertionValidator.requireSignedResponse(properties, null), is(propsRequire));
 	}
 
+	@ParameterizedTest
+	@CsvSource(value = {
+			"true, true, true",
+			"false, true, false",
+			"null, true, true",
+			"true, false, true",
+			"false, false, false",
+			"null, false, false"
+	}, nullValues = "null")
+	void requireAuthnRequestDestination(Boolean rpRequire, boolean propsRequire, boolean expectedRequire) {
+		var secPol = SecurityPolicies.builder().requireAuthnRequestDestination(rpRequire).build();
+		properties.getSecurity().setRequireAuthnRequestDestination(propsRequire);
+
+		assertThat(AssertionValidator.requireAuthnRequestDestination(properties, secPol), is(expectedRequire));
+		assertThat(AssertionValidator.requireAuthnRequestDestination(properties, null), is(propsRequire));
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"true, true, true",
+			"false, true, false",
+			"null, true, true",
+			"true, false, true",
+			"false, false, false",
+			"null, false, false"
+	}, nullValues = "null")
+	void requireResponseDestination(Boolean cpRequire, boolean propsRequire, boolean expectedRequire) {
+		var secPol = SecurityPolicies.builder().requireResponseDestination(cpRequire).build();
+		properties.getSecurity().setRequireResponseDestination(propsRequire);
+
+		assertThat(AssertionValidator.requireResponseDestination(properties, secPol), is(expectedRequire));
+		assertThat(AssertionValidator.requireResponseDestination(properties, null), is(propsRequire));
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"true, true, true",
+			"false, true, false",
+			"null, true, true",
+			"true, false, true",
+			"false, false, false",
+			"null, false, false"
+	}, nullValues = "null")
+	void requireLogoutRequestDestination(Boolean rpRequire, boolean propsRequire, boolean expectedRequire) {
+		var secPol = SecurityPolicies.builder().requireLogoutRequestDestination(rpRequire).build();
+		properties.getSecurity().setRequireLogoutRequestDestination(propsRequire);
+
+		assertThat(AssertionValidator.requireLogoutRequestDestination(properties, secPol), is(expectedRequire));
+		assertThat(AssertionValidator.requireLogoutRequestDestination(properties, null), is(propsRequire));
+	}
+
 	@Test
-	void testWhiteList() throws URISyntaxException {
-		ArrayList<String> urls = givenWhitelistUrls();
+	void testWhiteList() {
+		var urls = givenWhitelistUrls();
 		var acWhitelist = AcWhitelist.builder().acUrls(urls).build();
-		List<URI> acNetUrls = acWhitelist.getAcNetUrls();
-		assertThat(acNetUrls, is(List.of(
-				new URI("http://http.host.port.check/.*"), new URI("https://https.path.check/allowed/"),
-				new URI("https://https.path.port.check:1111/allowed/"), new URI("xtb://app/redirect")
-		)));
+		List<AcUrl> acUrls = acWhitelist.getAcUrls();
+		assertThat(acUrls, is(urls));
 		List<String> origins = acWhitelist.getOrigins();
 		assertThat(origins, is(List.of(
-				"http://http.host.port.check", "https://https.path.check",
+				"http://http.host.port.check", "http://path.regex", "https://https.path.check",
 				"https://https.path.port.check:1111", "xtb://app"
 		)));
 		acWhitelist = AcWhitelist.builder().acUrls(urls).build();
-		assertThat(acWhitelist.getAcNetUrls(), is(acNetUrls));
+		assertThat(acWhitelist.getAcUrls(), is(acUrls));
 		assertThat(acWhitelist.getOrigins(), is(origins));
 	}
 
@@ -1375,7 +1680,6 @@ class AssertionValidatorTest {
 		authnRequest.setIssuer(dummyIssuer());
 		authnRequest.setDestination("ssoURL");
 		authnRequest.setAssertionConsumerServiceURL("assertionConsumerServiceURL");
-		authnRequest.setID("id");
 		return authnRequest;
 	}
 
@@ -1386,6 +1690,22 @@ class AssertionValidatorTest {
 		authnRequest.setSignature(signature);
 		SamlUtil.prepareSamlObject(authnRequest, signature.getCanonicalizationAlgorithm(), signature, OpenSamlUtil.SKINNY_ALL);
 		return authnRequest;
+	}
+
+	private LogoutRequest givenSignedLogoutRequest() {
+		var logoutRequest = givenUnsignedLogoutRequest();
+
+		SamlTestBase.signSamlObject(logoutRequest);
+
+		return logoutRequest;
+	}
+
+	private LogoutRequest givenUnsignedLogoutRequest() {
+		var logoutRequest = OpenSamlUtil.buildSamlObject(LogoutRequest.class);
+		logoutRequest.setID("ID test");
+		logoutRequest.setIssuer(dummyIssuer());
+		logoutRequest.setDestination("ssoURL");
+		return logoutRequest;
 	}
 
 	private Issuer dummyIssuer() {
@@ -1416,18 +1736,23 @@ class AssertionValidatorTest {
 	}
 
 	private AcWhitelist givenWhiteList() {
-		ArrayList<String> urls = givenWhitelistUrls();
-		return AcWhitelist.builder().acUrls(urls).build();
+		var urls = givenWhitelistUrls();
+		var acWhitelist = AcWhitelist.builder().acUrls(urls).build();
+		// @Default is not applied, set it here:
+		acWhitelist.calculateDerivedUrls(AcceptedUrlFormat.FULL, Optional.empty());
+		return acWhitelist;
 	}
 
-	private static ArrayList<String> givenWhitelistUrls() {
-		var urls = new ArrayList<String>();
-		urls.add("ignore-broken"); // resilience on accepting broken ACL entries
-		urls.add("https://"); // resilience on accepting broken ACL entries
-		urls.add("http://http.host.port.check/.*"); // new regexp feature
-		urls.add("https://https.path.check/allowed/"); // existing exact match feature
-		urls.add("https://https.path.port.check:1111/allowed/"); // including port
-		urls.add("xtb://app/redirect"); // custom scheme
+	private static List<AcUrl> givenWhitelistUrls() {
+		List<AcUrl> urls = new ArrayList<AcUrl>();
+		urls.add(AcUrl.builder().url("ignore-broken").build()); // resilience on accepting broken ACL entries
+		urls.add(AcUrl.builder().url("https://").build()); // resilience on accepting broken ACL entries
+		urls.add(AcUrl.builder().url("http://http.host.port.check/").format(AcceptedUrlFormat.PREFIX).build()); // prefix match
+		urls.add(AcUrl.builder().url("http://path.regex/.*").format(AcceptedUrlFormat.PATH_REGEX).build()); // regex on path
+		urls.add(AcUrl.builder().url("http://[a-z]*\\.full\\.regex(|/.*)").format(AcceptedUrlFormat.REGEX).build()); // regex on URL
+		urls.add(AcUrl.builder().url("https://https.path.check/allowed/").build()); // exact match feature
+		urls.add(AcUrl.builder().url("https://https.path.port.check:1111/allowed/").build()); // including port
+		urls.add(AcUrl.builder().url("xtb://app/redirect").build()); // custom scheme
 		return urls;
 	}
 

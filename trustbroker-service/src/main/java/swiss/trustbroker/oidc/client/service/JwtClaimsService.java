@@ -26,6 +26,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.stereotype.Service;
+import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.util.CollectionUtil;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
@@ -33,7 +34,10 @@ import swiss.trustbroker.federation.xmlconfig.Definition;
 import swiss.trustbroker.homerealmdiscovery.util.DefinitionUtil;
 import swiss.trustbroker.homerealmdiscovery.util.RelyingPartyUtil;
 import swiss.trustbroker.mapping.service.ClaimsMapperService;
+import swiss.trustbroker.oidc.jackson.ObjectMapperFactory;
 import swiss.trustbroker.saml.dto.ClaimSource;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Handles OIDC claims from a CP JWT token.
@@ -42,6 +46,8 @@ import swiss.trustbroker.saml.dto.ClaimSource;
 @Slf4j
 @AllArgsConstructor
 public class JwtClaimsService {
+
+	private static final JsonMapper SPRING_SEC_JSON_MAPPER = ObjectMapperFactory.springSecObjectMapper();
 
 	private ClaimsMapperService claimsMapperService;
 
@@ -101,6 +107,7 @@ public class JwtClaimsService {
 			var name = claim.getKey();
 			var def = DefinitionUtil.findSingleValueByNameOrNamespace(name, null, cpAttributeDefinitions);
 			var definition = def.orElseGet(() -> Definition.ofNameAndSource(name, ClaimSource.CP.name()));
+			definition = definition.withSource(ClaimSource.CP.name());
 			attributes.put(definition, convertClaimValues(definition, claim.getValue()));
 		}
 
@@ -112,6 +119,12 @@ public class JwtClaimsService {
 		List<?> claimValues;
 		if (claimValue instanceof List<?> claimList) {
 			claimValues = claimList;
+			if (!claimValues.isEmpty() && claimValues.getFirst() instanceof Map<?, ?>) {
+				claimValues = List.of(toJsonString(claimValues));
+			}
+		}
+		else if (claimValue instanceof Map<?, ?> mapValue) {
+			claimValues = List.of(toJsonString(mapValue));
 		}
 		else if (claimValue instanceof Set<?> claimSet) {
 			claimValues = claimSet.stream().toList();
@@ -126,6 +139,15 @@ public class JwtClaimsService {
 			claimValues = claimsMapperService.applyMappers(definition, claimValues, "OIDC claims");
 		}
 		return CollectionUtil.toStringList(claimValues, Object::toString);
+	}
+
+	private String toJsonString(Object object) {
+		try {
+			return SPRING_SEC_JSON_MAPPER.writeValueAsString(object);
+		}
+		catch (JacksonException e) {
+			throw new TechnicalException(String.format("Unable to serialize claim value=%s to JSON", object), e);
+		}
 	}
 
 }

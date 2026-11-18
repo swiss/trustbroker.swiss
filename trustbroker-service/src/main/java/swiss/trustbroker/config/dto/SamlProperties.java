@@ -44,11 +44,10 @@ public class SamlProperties {
 	/**
 	 * SAML protocol enabled.
 	 * <br/>
-	 * Default: true
+	 * Default: false (since 1.16.0, but global application.yml still has true)
 	 * @since 1.14.0
 	 */
-	@Builder.Default
-	private boolean enabled = true;
+	private boolean enabled;
 
 	/**
 	 * XTB SAML consumer URL, included in the metadata.

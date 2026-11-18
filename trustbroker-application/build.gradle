@@ -12,6 +12,7 @@ dependencies {
 	implementation project("${rootProject.top}:trustbroker-service")
 	implementation project("${rootProject.top}:trustbroker-wstrust-service")
 	runtimeOnly project("${rootProject.top}:trustbroker-store-ldap")
+	runtimeOnly project("${rootProject.top}:trustbroker-store-rest")
 	runtimeOnly project("${rootProject.top}:trustbroker-frontend")
 
 	// baseline
@@ -73,6 +74,10 @@ task deleteCaches(type: Delete) {
 jib {
 	from {
 		image = rootProject.baseImage
+		auth {
+			username = project.repoUser
+			password = project.repoPass
+		}
 	}
 	to {
 		image = rootProject.dockerRegistry + '/trustbroker-swiss/trustbroker-application'

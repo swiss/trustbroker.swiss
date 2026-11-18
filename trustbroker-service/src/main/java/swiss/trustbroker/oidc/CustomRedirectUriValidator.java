@@ -27,6 +27,7 @@ package swiss.trustbroker.oidc;
 
 import java.util.function.Consumer;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
@@ -37,7 +38,10 @@ import org.springframework.security.oauth2.server.authorization.authentication.O
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.util.StringUtils;
+import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.common.util.UrlAcceptor;
+import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 
 /**
  * Partially copied from spring-security-oauth2-authorization-server:
@@ -61,7 +65,12 @@ import swiss.trustbroker.common.util.UrlAcceptor;
  * @see OAuth2AuthorizationCodeRequestAuthenticationProvider#setAuthenticationValidator(Consumer)
  */
 @Slf4j
+@AllArgsConstructor
 public class CustomRedirectUriValidator implements Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> {
+
+	private final RelyingPartyDefinitions relyingPartyDefinitions;
+
+	private final TrustBrokerProperties trustBrokerProperties;
 
 	@Override
 	public void accept(OAuth2AuthorizationCodeRequestAuthenticationContext authenticationContext) {
@@ -84,10 +93,16 @@ public class CustomRedirectUriValidator implements Consumer<OAuth2AuthorizationC
 		}
 	}
 
-	static void validateRedirectUri(RegisteredClient registeredClient,
+	void validateRedirectUri(RegisteredClient registeredClient,
 			OAuth2AuthorizationCodeRequestAuthenticationToken authorizationCodeRequestAuthentication,
 			String requestedRedirectUri) {
-		var clientRedirectUris = registeredClient.getRedirectUris();
+		// get original typed OidcClient redirect URLs
+		var client = relyingPartyDefinitions.getOidcClientConfigById(registeredClient.getClientId(), trustBrokerProperties);
+		if (client.isEmpty()) { // should never happen as the Spring registry is populated from the definitions
+			throw new TechnicalException(String.format("RegisteredClient oidcClientId=%s not found in RP OidcClient definitions",
+					registeredClient.getClientId()));
+		}
+		var clientRedirectUris = client.get().getRedirectUris().getRedirectUrls();
 		if (!UrlAcceptor.isRedirectUrlOkForAccess(requestedRedirectUri, clientRedirectUris)) {
 			log.error("oidcClient={} - requested redirectUri={} does not match configured redirectUris={}",
 					registeredClient.getClientId(), requestedRedirectUri, clientRedirectUris);

@@ -282,7 +282,7 @@ public class OidcTxFilter implements Filter {
 
 	private void handlePenTestRequest() {
 		if (HttpExchangeSupport.isRunningPenTestScenario()) {
-			scriptService.processOnMessage();
+			scriptService.processOnMessage("PenTestScenarios.groovy");
 		}
 	}
 

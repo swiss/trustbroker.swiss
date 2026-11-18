@@ -1,27 +1,144 @@
 # Unreleased Versions
 
-## 1.16.0 (2026-11)
+## 1.17.0 (2027-02)
+
+### Dependency upgrades
+
+- Backend: Minor/patch version upgrades
+- Frontend:
+    - Angular 22.2.5
+    - Oblique 16.0.4
+    - Minor/patch version upgrades
 
 ### Features
 
 - IDM:
-  - New REST client to integrate IDMs offering SCIM or other REST APIs.
+    - Support using `CPResponse` attributes as bearer token towards endpoint.
+    - API for custom authorization approaches.
+    - Support for `Boolean/Numeric/Object` and binary attributes from REST service response.
+
+### Improvements
+
+- OIDC:
+    - Allow enforcing DPoP (Demonstrating Proof of Possession) for token exchange.
+- Container:
+    - JVM memory heap tuning from default to 50% of the available memory (`-XX:MaxRAMPercentage=50.0`).
+- UI:
+    - Cleanup of the top-level resource paths.
+    - Generalized the HTTP level OIDC `/authorize` parameters.
+- Configuration:
+    - Consider feature enabling flags when creating the components, thus avoiding issues if the configuration of a disabled
+      component is incomplete.
+    - Align IDM global configuration with REST/LDAP. **Note that IDM configurations need to be adapted to this breaking change.**
+    - See Javadoc in `trustbroker/federation/xmlconfig` and `trustbroker/config` @since 1.17.0` for details on new configuration
+      options.
+
+# Released Versions
+
+## 1.16.0.20261109T110336Z (2026-11-17)
+
+### Dependency upgrades
+
+- Backend:
+    - Spring Boot 4.1.2
+    - Spring Cloud 2025.1.3
+    - Spring Security 7.1.1
+    - Apache CXF 4.2.3
+    - Apache WSS4J 3.0.6
+    - Bouncy Castle 1.86
+    - Jackson 2.21.8 / 3.1.8
+    - Neethi 3.2.4
+    - mariadb-java-client 3.5.10
+    - PostgreSQL 42.7.13
+    - Micrometer 1.17.1
+- Frontend:
+    - Angular 21.2.23 (CLI/build 21.2.24)
+    - Oblique 15.4.4
+    - angular-oauth2-oidc 20.0.3
+    - npm 11.19.1
+    - node 22.23.2
+    - zone.js 0.16.3
+    - jest 30.5.1
+    - jest-preset-angular 16.2.0
+    - @types/node 22.20.3
+    - @typescript-eslint 8.70.0
+    - eslint 9.39.5
+    - eslint-import-resolver-typescript 4.4.5
+    - eslint-plugin-prettier 5.5.6
+    - prettier 3.9.8
+
+### Features
+
+- IDM:
+    - New REST client to integrate IDMs offering SCIM or other REST APIs.
+- LDAP:
+    - Support multiple LDAP directories per instance.
+- Config:
+    - Support external RP-based tracking using `trustbroker.config.rpTxnIdParameter=agov_txn_id`. The parameter is
+      injected by RP, audited and propagatable by picking it from properties.
 
 ### Improvements
 
 - SAML:
     - Validation improvements.
+- OIDC:
+    - Hardened OIDC metadata URL validation.
+    - Support external relying-party-based tracking parameter.
 - WS-Trust:
     - Validation improvements.
 - Config:
     - Improvements for handling defaults in profile merging.
+    - Align REST and LDAP global configuration.
+    - Add `IdmQuery` `connection` attribute for explicit service selection.
+    - QoA flags are now merged from profile instead of using default (`enforce`, `mapOutbound` default `true`,
+      `singleQoaResponse` default `true`, `dropUnmappable`, `replaceInbound`).
+    - `ACUrl` changed to object with different format options. **If you are using wildcards in these elements, adapt these entries
+      to `format="PREFiX"` (and drop a trailing `/*`) or `format="PATTERN"` (for more complex regex patterns) or alternatively
+      change the global default to the backwards compatible `defaultAcUrlFormat: ANY` in `application.yml`.**
+    - `Announcements` is now enabled by default if present in `SetupRP` (add `enabled="false"` if it needs to be disabled).
+    - See Javadoc in `trustbroker/federation/xmlconfig` and `trustbroker/config` @since 1.16.0` for details on new configuration
+      options.
+- LDAP:
+    - Support multiple LDAP stores.
+    - Connection pooling for LDAP stores plus configurable connect/read timeouts.
+    - Binary support (e.g. Active Directory `objectSid` attribute).
+- UI:
+    - HRD notice screen supports arbitrary HTML blocks when text is enclosed in an HTML element i.e. starts with
+      `<` and ends with `>`
+- Scripting:
+    - Enrich request script hooks.
+- Container:
+    - Add support for custom health check scripts.
 
 ### Bugfixes
 
+- SAML:
+    - Support SAML2 requests without destination.
+    - Fixed SubjectConfirmationData.InResponseTo validation.
+    - Normalize perimeter URL trailing slash in SAML/WS-Fed entry points.
+    - Improve assertion validation logging.
+    - Fix SAML `SubjectConfirmationData` `InResponseTo` validation.
+    - Validate request and response destination. Opt out per RP/CP through `SecurityPolicies.requireAuthnRequestDestination`/
+      `requireLogoutRequestDestination`/`requireResponseDestination=false`.
+- OIDC:
+    - Do not enforce OIDC session for REST clients sending `accept: application/json`.
+    - Allow extra OIDC query params in auth redirect assertion.
+    - Token exchange:
+        - Fix error handling to send the correct error type.
+        - Fix Map handling for comma-separated values for token exchange.
+- WS-Trust:
+    - Fix SOAP message signature validation - restrict accepted signed elements.
 - SSO:
-  - Fix Velocity template for XTBAdditionalFields.
-
-# Released Versions
+    - Inject additional SLO fields via `XTBAdditionalFields` into the Velocity template.
+    - For SSO cookie name lookup consider authentication session subject.
+- IDM:
+    - Replace REST Webclient Accept header `application/scim+json` with `application/json`.
+- LDAP:
+    - StatusPolicy handling and logging.
+- Security:
+    - Restrict JSON `ObjectMapper` class exceptions to what is actually needed,
+      access filter query parameter blacklist extended (CVE-2026-19528).
+    - Device info API now validates the input RP/CP against the session.
 
 ## 1.15.0.20260817T100022Z
 
@@ -92,9 +209,9 @@
 ### Bugfixes
 
 - OIDC:
-    - Fix realm warning if multiple OIDC clients use the same ACUrl (those should be in the same RP).
+    - Fix realm warning if multiple OIDC clients use the same `ACUrl` (those should be in the same RP).
     - Extend OIDC metadata cache key with CP/RP ID and type to allow for same OIDC client IDs in different CPs and in RPs.
-    - Choose RelayState over cookies for OIDC session lookup to handle internal SAML request.
+    - Choose `RelayState` over cookies for OIDC session lookup to handle internal SAML request.
     - Fix missing global claim filter for Userinfo response when the access token is opaque.
     - Metadata: Do not add auth methods for disabled endpoints.
     - Do not add empty list values.
@@ -107,25 +224,26 @@
     - Validate CP selection after HRD against list of eligible CPs.
 - SSO:
     - Update SSO session QoA on step-up too.
+    - SLO URL query parameter names were rendered incorrectly in the Velocity template.
 - QoA:
     - Fix potential NPE in QoA enforce check.
 - Logging:
-    - Fix handling of double dash in OpenTelemetry injectoins.
+    - Fix handling of double dash in OpenTelemetry injections.
 - DB:
     - Fix index issue with large tokens for PostgreSQL.
 - Security:
     - Fix template parameter encoding issues.
     - State check for error page.
-    - Change defaults for network intraned/internet values to null.
+    - Change defaults for network intranet/internet values to null.
 - Configuration:
-    - Send configured CP orders to frontend also when HRD_BANNERS feature is not enabled.
+    - Send configured CP orders to frontend also when `HRD_BANNERS` feature is not enabled.
 
 ## 1.14.0.20260723T120038Z
 
 ### Improvements
 
 - Security:
-    - Access filter extended with a block list for request paramerter and HTTP headers.
+    - Access filter extended with a block list for request parameter and HTTP headers (CVE-2026-19528).
 
 ### Bugfixes
 
@@ -169,7 +287,7 @@
       further notice in the release notes. Please do not enable in production.
 - LDAP:
     - Organizational profile selection.
-    - Switch to osixia openldap image.
+    - Switch to `osixia/openldap` image.
 - Attributes:
     - Option to make individual attributes mandatory.
 - Cookies:
@@ -187,12 +305,12 @@
 - OIDC:
     - Fix handling of missing userinfo endpoint in CP.
     - Fix warnings in logs on configuration reload.
-    - Allow token introspection between clients in the same SetupRP.
-    - Claims mapper TIME_EPOCH now idempotent.
+    - Allow token introspection between clients in the same `SetupRP`.
+    - Claims mapper `TIME_EPOCH` now idempotent.
 - SAML:
     - Case normalization for redirect binding signature check.
 - WSTrust:
-    - Accept RST ISSUE envelope signed by assertion issuer.
+    - Accept `RST ISSUE` envelope signed by assertion issuer.
 - DB:
     - Fixed BLOB type for PostgreSQL.
 - Config:
@@ -208,7 +326,7 @@
 ### Bugfixes
 
 - SAML:
-    - Fixed InResponseTo validation, can be disabled via configuration.
+    - Fixed `InResponseTo` validation, can be disabled via configuration.
 
 ## 1.13.0.20260316T084959Z
 
@@ -240,21 +358,21 @@
     - Support for grant type token exchange (disabled by default). This feature is still in beta stage with 1.13.0, do not enable
       it in production.
 - WS-Fed:
-    - Basic support for SignIn / SignOut (disabled by default).
+    - Basic support for `SignIn` / `SignOut` (disabled by default).
 - Database:
     - Add PostgreSQL.
 - Test:
-    - Support manipulations on final messages via global script - can be used e.g. to simulate invalid respones towards counter
-      parties for security testing.
+    - Support manipulations on final messages via global script - can be used e.g. to simulate invalid responses towards
+      counterparties for security testing.
 
 ### Improvements
 
 - OIDC:
-    - Restrict default OIDC metadata grant_types_supported, revocation_endpoint_auth_methods_supported,
-      introspection_endpoint_auth_methods_supported to the ones officially supported in XTB.
-    - Option to only accept signed JWT response from backchannel userinfo call.
+    - Restrict default OIDC metadata `grant_types_supported`, `revocation_endpoint_auth_methods_supported`,
+      `introspection_endpoint_auth_methods_supported` to the ones officially supported in XTB.
+    - Option to only accept signed JWT response from back channel `userinfo` call.
 - SAML:
-    - SecutityPolicies.requireSignedLogoutRequest now defaults to requireSignedAuthnRequest.
+    - `SecutityPolicies.requireSignedLogoutRequest` now defaults to `requireSignedAuthnRequest`.
 - WSTrust:
     - The protocol is now disabled by default.
     - Additional config options to apply IP and network based restrictions.
@@ -263,10 +381,10 @@
 - IDM:
     - LDAP improvements and documentation.
 - SSO:
-    - Allow picking another claim than the subject from CP response to allow SSO using SubjectName with scope=SSO.
+    - Allow picking another claim than the subject from CP response to allow SSO using `SubjectName` with scope=SSO.
 - LDAP:
     - Improved profile selection support.
-    - Switched to osixia/openldap:stable image.
+    - Switched to `osixia/openldap:stable` image.
 - UI:
     - Support banners without entry in application.yml.
     - Support HTML tags in banner subtitle too.
@@ -278,15 +396,15 @@
 ### Bugfixes
 
 - SSO:
-    - Fix SSO join issue with CP that responds with another ID than requested (e.g. SamlMock).
-    - Fix too strict subject name check issue for CP with SubjectNameMapping.
+    - Fix SSO join issue with CP that responds with another ID than requested (e.g. `SamlMock`).
+    - Fix too strict subject name check issue for CP with `SubjectNameMapping`.
     - Fix QoA check with OIDC using RP config QoA instead of QoA from state.
     - Fix join via OIDC of session established via SAML.
 - WSTrust:
     - Recipient in Issue RSTR was set to issuer in 1.12.0, revert to 1.11.0 behavior.
     - Fixed signature validation of RST ISSUE.
 - Scripting:
-    - If scripts abort the flow in BeforeIdm hook, JIT provisioning and other processing is aborted.
+    - If scripts abort the flow in `BeforeIdm` hook, JIT provisioning and other processing is aborted.
 - UI:
     - Fixed injection issue.
 
@@ -297,9 +415,9 @@
 - SAML:
     - Fixed SAML request validation issue for redirect binding
 - OIDC:
-    - Unsigned JWT tokens received through backchannel connection are no longer accepted
+    - Unsigned JWT tokens received through back channel connection are no longer accepted
 - WSTrust:
-    - doSignResponse disabled by default - enabling requires a p12 certificate and password
+    - `doSignResponse` disabled by default - enabling requires a PKCS12 (`.p12`) certificate and password
 - LDAP:
     - Fix encoding of CP response parameters
 - SSO:
@@ -310,9 +428,10 @@
 ### Improvements
 
 - OIDC:
-    - Metadata defaults for grantTypes, introspectionEndpointAuthMethods, revocationEndpointAuthMethods matching supported values
+    - Metadata defaults for `grantTypes`, `introspectionEndpointAuthMethods`, `revocationEndpointAuthMethods` matching supported
+      values
 - SAML:
-    - SamlMock now supports samples structured in directories and configuration of the buttons to be shown
+    - `SamlMock` now supports samples structured in directories and configuration of the buttons to be shown
     - Optional trust anchor for SAML requests for test automation or monitoring
 
 ## 1.12.0.20251125T141545Z
@@ -320,15 +439,15 @@
 ### Bugfixes
 
 - SAML:
-    - The special origin value 'null' is accepted a valid origin with validateHttpHeaders=true
+    - The special origin value `null` is accepted a valid origin with `validateHttpHeaders=true`
 
 ### Improvements
 
 - SAML:
-    - The new ClaimsParty.ResponseIssuer can be set to decouple the CP response issuer from the ID.
+    - The new `ClaimsParty.ResponseIssuer` can be set to decouple the CP response issuer from the ID.
 - WSTrust:
-    - Option to sign WS-Trust RSTR responses
-    - Option to validate WS-Trust RENEW request
+    - Option to sign WS-Trust `RSTR` responses
+    - Option to validate WS-Trust `RENEW` request
 
 ## 1.12.0.20251003T122936Z
 
@@ -347,7 +466,7 @@
 ### Features
 
 - SAML:
-    - Support SOAP 1.1 binding for LogoutRequest
+    - Support SOAP 1.1 binding for `LogoutRequest`
 
 ### Improvements
 
@@ -355,37 +474,38 @@
     - Cache RP side OIDC configurations used for JWE (JSON Web Encryption)
     - Add encryption algorithms and methods to metadata
 - SAML:
-    - Allow validation of origin/referer HTTP headers against ACWhitelist with validateHttpHeaders=true for AuthnRequests
-    - Allow restricting bindings via SupportedBinding
-    - Added forwardRpProtocolBinding to control forwarding the ProtocolBinding from RP to CP
+    - Allow validation of origin/referer HTTP headers against `ACWhitelist` with `validateHttpHeaders=true` for `AuthnRequests`
+    - Allow restricting bindings via `SupportedBinding`
+    - Added `forwardRpProtocolBinding` to control forwarding the `ProtocolBinding` from RP to CP
 - WSTrust:
-    - Support ADFS compatibility URL /adfs/services/trust
-    - Support configuration of wsBasePath without hardcoded postfix
-    - Include SSO session ID in SessionIndex of RENEW response assertion SSO:
-    - Use SessionIndex from LogoutRequest locate as fallback to find SSO session
+    - Support ADFS compatibility URL `/adfs/services/trust`
+    - Support configuration of `wsBasePath` without hardcoded postfix
+    - Include SSO session ID in `SessionIndex` of `RENEW` response assertion SSO:
+    - Use `SessionIndex` from `LogoutRequest` locate as fallback to find SSO session
 - IDM:
-    - LDAP filtering improvements supporting '*' as wildcard and 'IDM:query_name:definition_name'
+    - LDAP filtering improvements supporting `*` as wildcard and `IDM:query_name:definition_name`
 - QoA:
-    - Add specifig NoAuthnContext error screen for QoA issues
+    - Add specific `NoAuthnContext` error screen for QoA issues
 - UI:
     - Render header buttons in the configured order to avoid use of tabIndex
 
 ### Bugfixes
 
 - Config:
-    - Fixes copying of some AccessRequest, ProfileSelection and Announcement properties from profile to RP
-    - SetupRP can now reference keystores in SetupRP's sub-path of keystores directory without specifiying the path, as specified
+    - Fixes copying of some `AccessRequest`, `ProfileSelection` and `Announcement` properties from profile to RP
+    - `SetupRP` can now reference keystores in `SetupRP`'s sub-path of keystores directory without specifying the path, as
+      specified
     - Merge SAML Qoa with OIDC Qoa
 - OIDC:
-    - Fixed double quoted encrypted userinfo response
-    - Fixed processing of multiple space-separated acr_values
+    - Fixed double-quoted encrypted userinfo response
+    - Fixed processing of multiple space-separated `acr_values`
     - Using correct private key for decryption of encrypted internal SAML messages
 - WSTrust:
     - Fixed validation and response issues in WSTrust RENEW request
 - SSO:
     - Fix NPE in SSO session checking when SAML SessionIndex is used
-    - Joining was not possible if the initiating paricipant did not sign the AuthnRequest
-    - Logout notifications are now enabled by default when the configuration contains SloResponse entries for notifications
+    - Joining was not possible if the initiating participant did not sign the `AuthnRequest`
+    - Logout notifications are now enabled by default when the configuration contains `SloResponse` entries for notifications
 - QoA:
     - Use correct QoA config for OIDC side CP check
 
@@ -405,27 +525,27 @@
     - Support for JWE (JSON Web Encryption)
     - Fetching of OIDC client metadata for encryption key discovery
 - WSTrust:
-    - Support for RENEW request if enabled (not yet fully functional in this release)
+    - Support for `RENEW` request if enabled (not yet fully functional in this release)
 - IDM:
     - Improvements for LDAP IDM interface
 
-### Improvmements
+### Improvements
 
 - Config:
     - IDM implementations can now be selected per query, allowing multiple implementations per RP
 - SAML:
-    - Allow AuthnRequest without AssertionConsumerServiceURL if enabled via AcWhitelist useDefault=true
+    - Allow `AuthnRequest` without `AssertionConsumerServiceURL` if enabled via `AcWhitelist` `useDefault=true`
 - SSO:
-    - Allow jointing SSO sessions with unsigned AuthnRequest if either requireSignedAuthnRequest=false or the new flag
-      requireSignedAuthnRequestForSsoJoin=false
+    - Allow jointing SSO sessions with unsigned `AuthnRequest` if either requireSignedAuthnRequest=false or the new flag
+      `requireSignedAuthnRequestForSsoJoin=false`
 - QoA:
-    - QoA handling is stricted with global policy enforceQoaIfMissing=true
+    - QoA handling is stricter with global policy `enforceQoaIfMissing=true`
     - Support downgrade CP response QoA to highest QoA requested by RP via downgradeToMaximumRequested
 - Scripting:
-    - CPResponse Groovy hook API methods aligned between all claim sources
+    - `CPResponse` Groovy hook API methods aligned between all claim sources
     - Allow scripts to add parameters to OIDC CP authorization requests via context
-      RpRequest.CONTEXT_OIDC_AUTHORIZATION_QUERY_PARAMETER
-    - AfterProvisioning script hook added
+      `RpRequest.CONTEXT_OIDC_AUTHORIZATION_QUERY_PARAMETER`
+    - `AfterProvisioning` script hook added
 
 ### Bugfixes
 
@@ -433,12 +553,12 @@
     - Fixed SubjectNameMappings for CP IDs that contain colons
 - OIDC:
     - The state parameter is now sends back to OIDC client on SAML responder errors
-    - Multiple OIDC acr_values are now correctly handled as space separated, not comma separated
+    - Multiple OIDC `acr_values` are now correctly handled as space separated, not comma separated
 - SAML:
-    - AuthnStatement now contains the (optional but recommended) SessionNotOrAfter timestamp
+    - `AuthnStatement` now contains the (optional but recommended) `SessionNotOrAfter` timestamp
     - Fixed serialization issue in SamlMock artifact cache
 - SSO:
-    - SessionNotOnOrAfter now considers refresh_token activity on the SSO session
+    - SessionNotOnOrAfter now considers `refresh_token` activity on the SSO session
     - No longer allow SSO if the AuthnRequest contains an invalid signature
 - QoA:
     - QoA enforcement now blocks properly in all cases also on RP side
@@ -452,35 +572,36 @@
 ### Features
 
 - OIDC CP support finalized.
-- HRD: Add support for multiple ClaimsProviderDefinition.xml
+- HRD: Add support for multiple `ClaimsProviderDefinition.xml`
 - HRD: Configurable HTTP query parameter to select a CP.
-    - In addition to CP.id also matched against CP.name or new CP.hrdHintAlias from the ClaimsProviderDefinition.xml for
+    - In addition to CP.id also matched against `CP.name` or new `CP.hrdHintAlias` from the `ClaimsProviderDefinition.xml` for
       decoupling.
 - First shot at an LDAP implementation of the IDM interface.
 
 ### Improvements
 
-- Check Javadoc entries "@since 1.10.0" for details on new configuration options.
-- New flag SecurityPolicies.ForceAuthn (RP or CP side) to enforce re-authentication on CP for CPs that cache the login state in
+- Check Javadoc entries `@since 1.10.0` for details on new configuration options.
+- New flag `SecurityPolicies.ForceAuthn` (RP or CP side) to enforce re-authentication on CP for CPs that cache the login state in
   the browser (defaulting to true for CPs).
 - XTB frontend resources can now be cached by the browser.
 - Added resilience support on StateCacheService and OAuth2AuthorizationService with configurable delay and retries (see
   StateCacheProperties).
 - SAML:
-    - Support SAML redirect binding for logout notifications and LogoutResponse: SloResponse binding=”REDIRECT”
+    - Support SAML redirect binding for logout notifications and LogoutResponse: `SloResponse binding="REDIRECT"`
     - New options to control signature and encryption of messages / assertions.
     - Support optional inline encryption key placement.
 - New date and time mappers for attributes:
-    - Definition.mappers TIME_ISO, DATE_ISO, DATE_LOCAL and support parsing of these date/time formats and parsing from ISO date
-      without time zone and from format 01.01.2000 [00:00:00]
+    - Definition.mappers `TIME_ISO`, `DATE_ISO`, `DATE_LOCAL` and support parsing of these date/time formats and parsing from ISO
+      date
+      without time zone and from format `01.01.2000 [00:00:00]`
     - Definition.mappers STRING, IGNORE
 - HRD: Provide more information for unavailable CPs in a popover.
-- Block OIDC redirect URIs that contain a user info part (...@).
+- Block OIDC redirect URIs that contain a user info part (`...@`).
 - Script API improvements:
-    - CPResponse.setAttribute/setAttribute s improved to just update the values and keep other settings of Definition
+    - `CPResponse.setAttribute/setAttribute` improved to just update the values and keep other settings of Definition
 - Merge QoA from ProfileRP when QoA list in SetupRP is empty to allow using the same default model.
 - OIDC CP mock claims now configurable in application.yaml
-- New FlowPolicies.link to show a button with a link to an application page.
+- New `FlowPolicies.link` to show a button with a link to an application page.
 - New options for Qoa configuration to control handling of inbound values.
 
 ### Bugfixes
@@ -490,20 +611,20 @@
     - ArtifactResolution service only shown if binding is enabled
     - Encryption metadata shows correct certificates
 - Ignore special QoA values like StrongestPossible for minimum/maximum calculations.
-- Ignore urltester on Internet access.
+- Ignore `urltester` on Internet access.
 - Fixes and layout improvements for new HRD.
-- Accept HTTP X-Request-Id being a UUID as some /robots.txt endpoints do not use hex32 but uuid32.
+- Accept HTTP X-Request-Id being a UUID as some `/robots.txt` endpoints do not use hex32 but uuid32.
 - Fix broken SAML mock artifact cache
 
-## v1.9.0.20250515T072935Z
+## 1.9.0.20250515T072935Z
 
 ### Bugfixes
 
-- Fix oauth2_authorization table not reap of unfinished authorizations or ones missing a refresh token (i.e. rows with NULL
+- Fix `oauth2_authorization` table not reap of unfinished authorizations or ones missing a refresh token (i.e. rows with `NULL`
   values). Note: This was not changed in 1.9.0 compared to previous releases. So depending on the database setup this could lead
   to leaking rows in earlier releases as well.
 
-## v1.9.0.20250415T132527Z
+## 1.9.0.20250415T132527Z
 
 ### Dependency upgrades
 
@@ -518,7 +639,7 @@
 - New HRD layout:
     - Configurable banners on top.
     - Tiles grouped by configured order.
-    - Disabled per default (GUI feature HRD_BANNERS, ClaimsProvider.order).
+    - Disabled per default (GUI feature `HRD_BANNERS`, `ClaimsProvider.order`).
     - The old layout will be removed earliest in 1.12.0.
 
 - QoA mapping and optional enforcement from/to RP and CP:
@@ -533,21 +654,22 @@
 ### Improvements
 
 - Browser support: Add polyfills for older browser versions – last 4 Chrome/FF/Edge and last 5 Safari versions.
-- To prevent unnecessary pod restarts when the infrastructure has problems, configure and use /actuator/health/readiness and
-  /actuator/health/liveness probes.
+- To prevent unnecessary pod restarts when the infrastructure has problems, configure and use `/actuator/health/readiness` and
+  `/actuator/health/liveness` probes.
     - Added timing information for readiness/liveness probes.
 - Error handling of ‘state not found’ exceptions was improved in the global exception handler allowing to configure a separated
   error message and user flow.
 - Claims mapping: The new ClaimsSelection can be used to aggregate all claims sources using Definition source instead.
-    - Supported sources are CP, IDM, IDM:queryname, SCRIPT (when groovy scripts manipulate IDM claims), PROPS, and CONFIG
+    - Supported sources are `CP`, `IDM`, `IDM:queryname`, SCRIPT (when Groovy scripts manipulate IDM claims), `PROPS`, and
+      `CONFIG`.
     - The ConstAttributes section was deprecated and can be replaced by ClaimsSelection specifying the value in the configuration.
       The CONFIG source is used to identify these claims.
 - SAML RP side dynamic SAML AuthnRequest.ProtocolBinding supported instead of assuming a fixed configuration in XTB.
 - WS-Trust clock skew supported to handle clients using system clocks running in the future (the same skew configuration than for
   SAML protocol is used).
-- OIDC QoA and state handling was improved by using the spring-security continue marker (identifying an ongoing login) and in
-  addition supporting acr_values as a trigger to check for SSO and step-up in addition to the already implemented prompt=login
-  support. Forcing a login can therefore also be done with the acr_values in the authorize request.
+- OIDC QoA and state handling was improved by using the Spring Security continue marker (identifying an ongoing login) and in
+  addition supporting `acr_values` as a trigger to check for SSO and step-up in addition to the already implemented prompt=login
+  support. Forcing a login can therefore also be done with the `acr_values` in the authorize request.
 - HRD handles disabled CPs now in rendering (e.g. controlled via announcements).
 - Script API: Scripts can skip/enforce features via CPResponse/RPRequest
 - Reduce unnecessary warnings in logs.
@@ -556,9 +678,9 @@
 
 - Invalidate XTB session in case of session compatibility issues between XTB releases.
 - Script based CPResponse flow policy shows support info on error screens.
-- Error screen with ‘Continue to application’ now also works without a state (before user was stuck on the screen).
-- OIDC logout: Consider realm logout requests without a client_id parameter to address ambiguities between multiple SetupRP that
-  contain the same redirect_uri
+- Error screen with _Continue to application_ now also works without a state (before user was stuck on the screen).
+- OIDC logout: Consider realm logout requests without a `client_id` parameter to address ambiguities between multiple SetupRP that
+  contain the same `redirect_uri`
 - Retry to handle 'SAML AuthnRequest state lost' problem when establishing OIDC session on redirect from SAML to OIDC sub-system
 - Fix reset of selected profile when logging in with a new RP using SSO.
 
@@ -566,39 +688,39 @@
 
 - Validate OIDC error redirect URIs against config for error redirects as well.
 
-## v1.8.0.20250218T172031Z
+## 1.8.0.20250218T172031Z
 
 ### Improvements
 
 - New parameters to control OIDC refresh token lifetime.
-- _SubjecNameMappings_ now configurable on both RP and CP side.
+- `SubjecNameMappings` now configurable on both RP and CP side.
 - Flow policies support direct redirects.
-- _OpsDebug_ feature improved allowing customization of log levels.
+- `OpsDebug` feature improved allowing customization of log levels.
 - Script compilation errors are now reflected on status API.
-- Script hook _BeforeResponse_ added to allow scripts on the complete, yet unfiltered output data.
-- new _OpsAudit_ logging allows controlling what data is audited.
+- Script hook `BeforeResponse` added to allow scripts on the complete, yet unfiltered output data.
+- new `OpsAudit` logging allows controlling what data is audited.
 - Dependencies updated.
 
 ### Fixes
 
-- OIDC setup without client secret addressed with a private _authorization_code_ lead to HTTP 302 instead of 401.
+- OIDC setup without client secret addressed with a private `authorization_code` lead to HTTP 302 instead of 401.
 - Fix selection of default language if there is no language cookie.
 
 ## v1.7.0.20241021T070518Z
 
 ### Improvements
 
-- Error page is now sent as JSON if any of the HTTP headers configured in _trustbroker.config.oidc.jsonErrorPageHeaders_ matches.
+- Error page is now sent as JSON if any of the HTTP headers configured in `trustbroker.config.oidc.jsonErrorPageHeaders` matches.
 - Error logging cleanup.
-- _RPRequest_ (with _rpIssuer_, _applicationName_, _contextClasses_, _referer_) object is now available to script hooks in the
+- `RPRequest` (with `rpIssuer`, `applicationName`, `contextClasses`, `referer`) object is now available to script hooks in the
   response phase.
 
 ### Fixes
 
 - Disable Spring in-memory session storage that led to a memory leak causing out of memory conditions under load.
-- _refresh_token_ expiration was not considered during reaping of OIDC tokens.
+- `refresh_token` expiration was not considered during reaping of OIDC tokens.
 
-## v1.7.0.20240926T102809Z
+## 1.7.0.20240926T102809Z
 
 ### Features
 
@@ -606,41 +728,40 @@
 - Configurable support debug feature added to produce DEBUG logs if signaled via HTTP protocol.
 - Micrometer for Prometheus monitoring.
 - New APIs:
-    - _/api/v1/config/status_ to report broken configurations (access restricted to internal network).
-    - _/api/v1/config/schemas/{file}_ provides current configuration XSDs (access restricted to internal network).
-    - _/api/v1/version_ showing the deployed version.
+    - `/api/v1/config/status` to report broken configurations (access restricted to internal network).
+    - `/api/v1/config/schemas/{file}` provides current configuration XSDs (access restricted to internal network).
+    - `/api/v1/version` showing the deployed version.
 
 ### Improvements
 
 - OIDC:
     - New attribute mapper for e-mail with lower case transformation and de-duplication.
-    - Fragment _redirect_uri_ handling supports arbitrary non-RFC3986 compliant query and fragment parameters now (caused breaking
+    - Fragment `redirect_uri` handling supports arbitrary non-RFC3986 compliant query and fragment parameters now (caused breaking
       applications using deep-links with parameters).
     - SSO cookie also set on OIDC domain for improved global logout handling.
 - Tracing:
     - OpenTelemetry-aligned conversation ID support added.
     - Additional HTTP protocol detail logging can be enabled if a conversation ID is defined.
-- Markup/markdown support for translations improved to allow sanitized HTML and markdown links (except in top level titles, button
+- Markup/markdown support for translations improved to allow sanitized HTML and Markdown links (except in top level titles, button
   names, labels).
 - Upgrade to latest JDK/17, Spring Boot, Oblique.
 
 ### Fixes
 
 - OIDC:
-    - Fixed issues in session probing with _prompt=none_.
+    - Fixed issues in session probing with `prompt=none`.
     - Fixed device ID check breaking SSO with OIDC session joiners. This also fixes a potential performance issue.
-    - Fixed performance issues on /introspect and /revoke (additional indexes on _oauth2_authorization_ table).
-    - _redirect_uri_ containing non-existing DNS endpoints could result in 15 to 25 seconds timeouts on validation.
+    - Fixed performance issues on /introspect and /revoke (additional indexes on `oauth2_authorization` table).
+    - `redirect_uri` containing non-existing DNS endpoints could result in 15 to 25 seconds timeouts on validation.
 - Fixed issue on bootstrap for not yet existing keystore.
-- Fixed _RequestDeniedException_ log message _cpIssuer=null_.
+- Fixed `RequestDeniedException` log message `cpIssuer=null`.
 
 ### Compatibility
 
-- Check for _Potentially breaking changes_ Javadoc comments in _trustbroker/federation/xmlconfig_ and _trustbroker/config_:
+- Check for _Potentially breaking changes_ Javadoc comments in `trustbroker/federation/xmlconfig` and `trustbroker/config`:
     - Some additional XML values are now validated via XSD.
-    - The new _trustbroker.config.globalScriptPath_ was formerly included in the default _trustbroker.config.scriptPath_.
+    - The new `trustbroker.config.globalScriptPath` was formerly included in the default `trustbroker.config.scriptPath`.
 
-## v1.6.0.20240819T100141Z
+## 1.6.0.20240819T100141Z
 
 Initial open sourcing release of trustbroker.swiss.
-

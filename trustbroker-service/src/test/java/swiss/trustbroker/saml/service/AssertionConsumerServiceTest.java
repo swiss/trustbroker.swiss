@@ -32,7 +32,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -68,6 +67,7 @@ import swiss.trustbroker.config.dto.NetworkConfig;
 import swiss.trustbroker.config.dto.SamlNamespace;
 import swiss.trustbroker.config.dto.SamlProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.ArtifactBinding;
 import swiss.trustbroker.federation.xmlconfig.ArtifactBindingMode;
@@ -104,6 +104,8 @@ class AssertionConsumerServiceTest {
 	private static final String TEST_CP_MOCK = "urn:test:MOCK";
 
 	private static final String TEST_CP_ID = "urn:test:TESTCP";
+
+	private static final String TEST_PERIMETER_URL = "http://test.trustbroker.swiss";
 
 	private static final String REFERRER = "https://localhost";
 
@@ -149,7 +151,9 @@ class AssertionConsumerServiceTest {
 	@BeforeEach
 	void setupTest() {
 		doReturn(givenNetworkConfig()).when(trustBrokerProperties).getNetwork();
-		doReturn(new SamlProperties()).when(trustBrokerProperties).getSaml();
+		doReturn(TEST_PERIMETER_URL).when(trustBrokerProperties).getPerimeterUrl();
+		var samlProperties = SamlProperties.builder().enabled(true).build();
+		when(trustBrokerProperties.getSaml()).thenReturn(samlProperties);
 		doAnswer(invocation -> invocation.getArgument(1)).when(hrdService).adaptClaimsProviderMappings(any(), any());
 	}
 
@@ -262,6 +266,7 @@ class AssertionConsumerServiceTest {
 	@Test
 	void handleSuccessCpResponseAuthnRequestIssuerId() {
 		var response = SamlFactory.createResponse(Response.class, TEST_CP);
+		response.setDestination(TEST_PERIMETER_URL + ApiSupport.SAML_API);
 		response.setStatus(SamlFactory.createResponseStatus(StatusCode.SUCCESS));
 		response.setInResponseTo(RELAY_STATE);
 		var rpIssuerId = "customIssuer1";
@@ -277,7 +282,6 @@ class AssertionConsumerServiceTest {
 							 .id(rpIssuerId)
 							 .build();
 		when(relyingPartySetupService.getRelyingPartyByIssuerIdOrReferrer(eq(rpIssuerId), any())).thenReturn(rp);
-		when(trustBrokerProperties.getSaml()).thenReturn(new SamlProperties());
 		var responseData = ResponseData.of(response, RELAY_STATE, SignatureContext.forArtifactBinding());
 		assertDoesNotThrow(() -> assertionConsumerService.handleSuccessCpResponse(responseData));
 	}
@@ -329,6 +333,7 @@ class AssertionConsumerServiceTest {
 		var response = SamlFactory.createResponse(Response.class, TEST_CP);
 		response.getAssertions().add(OpenSamlUtil.buildAssertionObject());
 		response.setInResponseTo(RELAY_STATE);
+		response.setDestination(TEST_PERIMETER_URL + ApiSupport.SAML_API);
 		var status = SamlFactory.createResponseStatus(StatusCode.RESPONDER, "message", StatusCode.UNKNOWN_PRINCIPAL);
 		response.setStatus(status);
 		// state
@@ -337,6 +342,7 @@ class AssertionConsumerServiceTest {
 		state.getSpStateData().setReferer(REFERRER);
 		// properties
 		var saml = new SamlProperties();
+		saml.setEnabled(true);
 		saml.setFlowPolicyNamespaces(List.of(new SamlNamespace("urn:oasis:names:tc:SAML:2.0:status", null)));
 		doReturn(saml).when(trustBrokerProperties).getSaml();
 		mockSecurityChecks(false, true, false, false);
@@ -400,7 +406,7 @@ class AssertionConsumerServiceTest {
 		var url2port = "https://server2:443/";
 		var relyingParty = RelyingParty.builder()
 				.id("TEST-ID")
-				.acWhitelist(new AcWhitelist(Arrays.asList(url1, url2, url3)))
+				.acWhitelist(new AcWhitelist(List.of(AcUrl.of(url1), AcUrl.of(url2), AcUrl.of(url3))))
 				.build();
 		// all single permutations
 		assertEquals(url1, assertionConsumerService.getAssertionConsumerServiceUrl(url1, null, null, relyingParty));
@@ -432,7 +438,7 @@ class AssertionConsumerServiceTest {
 		doReturn(new SecurityChecks()).when(trustBrokerProperties).getSecurity();
 		var url1 = "https://server1/acsurl1";
 		var url2 = "https://server2/acsurl1";
-		var acWhitelist = new AcWhitelist(Arrays.asList(url1, url2));
+		var acWhitelist = new AcWhitelist(List.of(AcUrl.of(url1), AcUrl.of(url2)));
 		acWhitelist.setUseDefault(true);
 		var relyingParty = RelyingParty.builder()
 									   .id("TEST-ID")
@@ -578,6 +584,7 @@ class AssertionConsumerServiceTest {
 		return ClaimsParty.builder()
 				.id(cpId)
 				.saml(Saml.builder()
+						.enabled(true)
 						.artifactBinding(ArtifactBinding.builder().inboundMode(mode).build())
 						.build()
 				)
@@ -628,5 +635,27 @@ class AssertionConsumerServiceTest {
 		                    .intranetNetworkName("INTRANET")
 		                    .internetNetworkName("INTERNET")
 		                    .build();
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			// referer with single scope
+			"https://example.com/auth?scope=openid, openid",
+			// referer with multiple scopes (space-separated, URL-encoded)
+			"https://example.com/auth?scope=openid%20profile%20email, openid profile email",
+			// referer with scope and other params
+			"https://example.com/auth?client_id=myapp&scope=openid%20profile, openid profile",
+			// referer without scope param => null result
+			"https://example.com/auth?client_id=myapp, null",
+			// null referer => null result
+			"null, null",
+			// malformed referer containing a scope token => null result, not an exception
+			"not a real uri but mentions scope and has spaces, null",
+			// plain string containing the word 'scope' but without a scope query parameter => null result
+			"not a real uri but mentions scope somehow, null",
+	}, nullValues = "null")
+	void extractScopesFromUrl(String url, String expectedScopes) {
+		var result = assertionConsumerService.extractScopesFromUrl(url, new MockHttpServletRequest());
+		assertThat(result, is(expectedScopes));
 	}
 }

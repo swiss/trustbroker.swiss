@@ -196,7 +196,7 @@ public class CustomTokenIntrospectionAuthenticationProvider implements Authentic
 		return OAuth2TokenIntrospectionAuthenticationToken.class.isAssignableFrom(authentication);
 	}
 
-	private static OAuth2TokenIntrospection withActiveTokenClaims(
+	static OAuth2TokenIntrospection withActiveTokenClaims(
 			OAuth2Authorization.Token<OAuth2Token> authorizedToken, RegisteredClient authorizedClient) {
 
 		OAuth2TokenIntrospection.Builder tokenClaims;

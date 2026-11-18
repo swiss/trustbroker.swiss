@@ -25,6 +25,14 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import swiss.trustbroker.util.ApiSupport;
 
+/**
+ * Tests for LDAP Identity Selection Service
+ *
+ * Note: This class extends the abstract IdentitySelectionService base class.
+ * Tests verify the concrete LDAP implementation as well as inherited common logic.
+ *
+ * @see IdentitySelectionService
+ */
 @SpringBootTest(properties = {
 		"trustbroker.config.ldap.enabled=true",
 		"trustbroker.config.profileselection.enabled=true"

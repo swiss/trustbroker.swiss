@@ -49,4 +49,26 @@ public class ClaimSourceUtil {
 		}
 		return false;
 	}
+
+	public static String getSourceFromProfileSelector(String profileSelector) {
+		if (profileSelector == null || profileSelector.isBlank()) {
+			return profileSelector;
+		}
+		var lastSeparator = profileSelector.lastIndexOf(SEPARATOR);
+		if (lastSeparator <= 0) {
+			return profileSelector;
+		}
+		return profileSelector.substring(0, lastSeparator);
+	}
+
+	public static String getProfileSelector(String profileSelector) {
+		if (profileSelector == null || profileSelector.isBlank()) {
+			return profileSelector;
+		}
+		var lastSeparator = profileSelector.lastIndexOf(SEPARATOR);
+		if (lastSeparator <= 0) {
+			return profileSelector;
+		}
+		return profileSelector.substring(lastSeparator + 1);
+	}
 }

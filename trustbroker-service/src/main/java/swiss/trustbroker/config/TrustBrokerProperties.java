@@ -28,6 +28,7 @@ import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Configuration;
 import swiss.trustbroker.common.config.KeystoreProperties;
 import swiss.trustbroker.common.config.RegexNameValue;
+import swiss.trustbroker.common.dto.AcceptedUrlFormat;
 import swiss.trustbroker.common.saml.util.OpenSamlUtil;
 import swiss.trustbroker.common.setup.config.BootstrapProperties;
 import swiss.trustbroker.common.util.WebUtil;
@@ -46,6 +47,7 @@ import swiss.trustbroker.config.dto.NetworkConfig;
 import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.ProfileSelectionConfig;
 import swiss.trustbroker.config.dto.QualityOfAuthenticationConfig;
+import swiss.trustbroker.config.dto.RestStoreConfig;
 import swiss.trustbroker.config.dto.SamlProperties;
 import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.config.dto.SsoConfig;
@@ -164,6 +166,14 @@ public class TrustBrokerProperties {
 	private String globalProfilesPath;
 
 	/**
+	 * Default for ACUrl type.
+	 * <br/>
+	 * @see swiss.trustbroker.federation.xmlconfig.AcUrl#getFormat()
+	 * @since 1.16.0
+	 */
+	private AcceptedUrlFormat defaultAcUrlFormat;
+
+	/**
 	 * Default signer.
 	 */
 	private KeystoreProperties signer;
@@ -188,6 +198,13 @@ public class TrustBrokerProperties {
 	 * Configuration for optional LDAP integration.
 	 */
 	private LdapStoreConfig ldap = new LdapStoreConfig();
+
+	/**
+	 * Configuration for optional REST (SCIM) integration.
+	 *
+	 * @since 1.16.0
+	 */
+	private RestStoreConfig rest = new RestStoreConfig();
 
 	/**
 	 * Configuration for attributes
@@ -459,6 +476,14 @@ public class TrustBrokerProperties {
 	private String hrdHintParameter;
 
 	/**
+	 * HTTP GET or POST query parameter I client can choose for auditing (as rpTxnId) and to get it back in assertions/tokens.
+	 * Set a value e.g. 'rp_txn_id' to pick it up from /authorize or /api/v1/saml endpoint.
+	 * It can be picked from source=PROPS into tokens/assertions (shortname RpTxnId, namespaceUri must be configured if
+	 * @since 1.16.0
+	 */
+	private String rpTxnIdParameter;
+
+	/**
 	 * HTTP header / cookie name to allow a testing framework to pass a CP to be selected in HRD.
 	 * <br/>
 	 * For normal applications, setting HTTP headers or cookies is usually not convenient (see <code>hrdHintParameter</code>).
@@ -584,11 +609,12 @@ public class TrustBrokerProperties {
 	 * Default:
 	 * <ul>
 	 *    <li>@class used by Jackson JSON</li>
+	 *    <li>@type used by Jackson JSON (added in 1.16.0)</li>
 	 * </ul>
 	 *
 	 * @since 1.14.0
 	 */
-	private List<String> blockedRequestParameterNames = List.of("@class");
+	private List<String> blockedRequestParameterNames = List.of("@class", "@type");
 
 	/**
 	 * Header block list.

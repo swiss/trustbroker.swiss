@@ -138,7 +138,8 @@ class ScriptServiceTest {
 		assertThat(result.keySet(), containsInAnyOrder(
 				ENCODE_PASSWORD,
 				TENANT1_PATH + REMOVE_IDM_USER_DETAILS_AFTER_IDM,
-				TENANT2_PATH + ADJUST_OIDC_ATTRIBUTE_NAMES));
+				TENANT2_PATH + ADJUST_OIDC_ATTRIBUTE_NAMES,
+				"hooks/RecordHookCall.groovy"));
 	}
 
 	@Test

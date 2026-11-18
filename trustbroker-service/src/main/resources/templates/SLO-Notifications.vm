@@ -103,7 +103,7 @@
 
   function setupNotifications() {
     #foreach( $result in $XTBSloNotifications )
-      #set($description = "${result.Slo.Protocol}:${result.Slo.Mode}:${result.Slo.Url}")
+      #set($description = "${result.Slo.Protocol}:${result.Slo.Mode}:${result.EncodedSloUrl}")
       #if($XTBSloConsoleDebug)console.debug('Logout notification $description');#end
       ## Url originates from trusted XTB configuration, can be savely used
       ## fetch(Url) / XMLHttpRequest(Url) might not work due to CORS restrictions
@@ -124,7 +124,7 @@
       #if ($result.Slo.Protocol == 'SAML2')
         ## form is embedded in iframe srcdoc hence the HTML encoded quotes
         ## there is a different DOM so the form name does not have to be unique
-        #set($form = "<form name=&quot;saml.notify&quot; action=&quot;${result.EncodedUrl}&quot; method=&quot;${result.samlHttpMethod}&quot;>")
+        #set($form = "<form name=&quot;saml.notify&quot; action=&quot;${result.DoubleEncodedUrl}&quot; method=&quot;${result.samlHttpMethod}&quot;>")
         #if($result.SamlRelayState)
           #set($form = "${form}<input type=&quot;hidden&quot; name=&quot;RelayState&quot; value=&quot;${result.SamlRelayState}&quot;/>")
         #end
@@ -137,8 +137,8 @@
 		#if($result.SamlRedirectSignature)
 		  #set($form = "${form}<input type=&quot;hidden&quot; name=&quot;Signature&quot; value=&quot;${result.SamlRedirectSignature}&quot;/>")
 		#end
-		#foreach($field in ${result.queryParameters})
-		  #set($form = "${form}<input type=&quot;hidden&quot; name=&quot;${field.name}&quot; value=&quot;$!{field.value}&quot;/>")
+		#foreach($field in ${result.DoubleEncodedQueryParameters})
+		  #set($form = "${form}<input type=&quot;hidden&quot; name=&quot;${field.key}&quot; value=&quot;$!{field.value}&quot;/>")
 		#end
         #set($form = "${form}</form>")
         ## first on load based on srcdoc submits the form, second one fails because of cross origin and does the completion hook

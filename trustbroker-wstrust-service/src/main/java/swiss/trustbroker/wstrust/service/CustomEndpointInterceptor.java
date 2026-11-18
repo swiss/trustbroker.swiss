@@ -115,10 +115,9 @@ public class CustomEndpointInterceptor implements SoapEndpointInterceptor {
 		SamlTracer.logSoapObject(">>>>> Incoming RST SOAP body", bodyNode, WsTrustUtil.OP_LOG);
 
 		// check after logging
-		if (!WsTrustUtil.isNetworkAllowed(trustBrokerProperties.getWstrust().getAllowedNetworks(),
-				trustBrokerProperties.getWstrust().isEnforceNetwork(), WebSupport.getWebRequest(),
-				trustBrokerProperties.getNetwork()) ||
-				!WsTrustUtil.isClientIpAllowed(trustBrokerProperties.getWstrust().getAllowedClientIpRegex(),
+		if (!WebSupport.isNetworkAllowed("WS-Trust", trustBrokerProperties.getWstrust().getAllowedNetworks(),
+				trustBrokerProperties.getWstrust().isEnforceNetwork(), trustBrokerProperties.getNetwork(), null) ||
+				!WebSupport.isClientIpAllowed("WS-Trust", trustBrokerProperties.getWstrust().getAllowedClientIpRegex(),
 						trustBrokerProperties.getWstrust().isEnforceClientIp(), TraceSupport.getClientIp())) {
 			return false;
 		}
@@ -164,17 +163,22 @@ public class CustomEndpointInterceptor implements SoapEndpointInterceptor {
 	}
 
 	private static void processSecurityHeader(Security securityHeader, SoapMessageHeader requestHeader) {
-		log.debug("Incoming Security header with namespace uri={}", securityHeader.getElementQName());
+		log.debug("Incoming Security header with QName={}", securityHeader.getElementQName());
 
 		List<XMLObject> orderedChildren = securityHeader.getOrderedChildren();
 		if (orderedChildren == null) {
+			log.info("Incoming Security header is empty with QName={}", securityHeader.getElementQName());
 			return;
 		}
 		for (XMLObject xmlObject : orderedChildren) {
 			if (xmlObject instanceof Assertion assertion) {
 				log.debug("Assertion id={}", assertion.getID());
 				if (requestHeader.getAssertion() != null) {
-					log.error("SOAP header contains multiple Assertion objects");
+					// the assertion picked here is validated, so there is risk of confusion
+					// if we reject duplicate assertions, some clients might break - alternatively we could collect all
+					// assertions and decide in the validation per client whether to accept multiple assertions or not
+					log.error("SOAP header contains multiple Assertion objects replacing assertion id1={} with id2={}",
+							requestHeader.getAssertion().getID(), assertion.getID());
 				}
 				requestHeader.setAssertion(assertion);
 			}

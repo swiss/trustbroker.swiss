@@ -51,7 +51,7 @@ import org.springframework.util.StringUtils;
 @Slf4j
 public class CustomOAuth2EndpointUtils {
 
-	static final String ACCESS_TOKEN_REQUEST_ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-5.2";
+	static final String ACCESS_TOKEN_REQUEST_ERROR_URI = CustomOAuth2ErrorCodes.ACCESS_TOKEN_REQUEST_ERROR_URI;
 
 	private CustomOAuth2EndpointUtils(){}
 
@@ -93,9 +93,9 @@ public class CustomOAuth2EndpointUtils {
 		throw new OidcExceptionHelper.OidcAuthenticationException(error, description);
 	}
 
-	static void throwErrorWithMessage(String errorCode, String message, String errorUri) {
-		log.error(message);
-		var error = new OAuth2Error(errorCode, message, errorUri);
-		throw new OidcExceptionHelper.OidcAuthenticationException(error, message);
+	static void throwErrorWithMessage(String errorCode, String errorMessage, String logMessage, String errorUri) {
+		log.error(logMessage);
+		var error = new OAuth2Error(errorCode, errorMessage, errorUri);
+		throw new OidcExceptionHelper.OidcAuthenticationException(error, errorMessage);
 	}
 }

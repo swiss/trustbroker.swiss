@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+import org.jspecify.annotations.NonNull;
 import swiss.trustbroker.api.idm.dto.IdmResult;
 import swiss.trustbroker.api.idm.service.IdmQueryService;
 import swiss.trustbroker.api.idm.service.IdmStatusPolicyCallback;
@@ -36,7 +37,9 @@ import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
 import swiss.trustbroker.federation.xmlconfig.Definition;
 import swiss.trustbroker.federation.xmlconfig.IdmLookup;
 import swiss.trustbroker.federation.xmlconfig.IdmQuery;
+import swiss.trustbroker.federation.xmlconfig.QueryControl;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
+import swiss.trustbroker.federation.xmlconfig.StatusPolicy;
 import swiss.trustbroker.saml.dto.CpResponse;
 
 @Slf4j
@@ -128,24 +131,46 @@ public class RelyingPartyUtil {
 			}
 			var idmService = idmServiceOpt.get();
 			var state = overallState.computeIfAbsent(idmService, key -> new HashMap<>());
+			var isPrimaryQuery = query.queryControlWithDefault() == QueryControl.PRIMARY;
+			var previousPrimaryUserCount = result.getLastQueryUserDetailsCount();
+			if (isPrimaryQuery) {
+				result.setLastQueryUserDetailsCount(0);
+			}
 			log.debug("RpIssuerId={} - calling audited={} query={} with store={}",
 					relyingParty.getId(), audited, query.getId(), idmService.getStoreName());
-			var queryDone = audited ?
-					idmService.getAttributesAudited(relyingParty, cpResponse, query, statusPolicyCallback, state, result) :
-					idmService.getAttributes(relyingParty, cpResponse, query, statusPolicyCallback, state, result);
+			var queryDone = isQueryDone(cpResponse, relyingParty, audited, statusPolicyCallback, query, idmService, state, result);
+			if (!isPrimaryQuery) {
+				result.setLastQueryUserDetailsCount(previousPrimaryUserCount);
+			}
 			if (queryDone) {
 				result.getQueriedStores().add(idmService.getStoreName());
 				anyQueryDone = true;
 			}
+			if (StatusPolicy.STOP_ON_USER_FOUND.equals(query.statusPolicyWithDefault()) && result.getLastQueryUserDetailsCount() > 0) {
+				log.debug("RpIssuerId={} - stopping IdmLookup after query={} due to statusPolicy={} and lastQueryUserDetailsCount={}",
+						relyingParty.getId(), query.getName(), StatusPolicy.STOP_ON_USER_FOUND, result.getLastQueryUserDetailsCount());
+				break;
+			}
 		}
+		return getIdmResult(relyingParty, anyQueryDone, result);
+	}
+
+	private static @NonNull Optional<IdmResult> getIdmResult(RelyingParty relyingParty, boolean anyQueryDone, IdmResult result) {
 		if (anyQueryDone) {
 			log.debug("Returning IdmLookup result from stores={}", result.getQueriedStores());
 			return Optional.of(result);
 		}
-		else {
-			log.debug("RpIssuerId={} IdmLookup did not execute any queries", relyingParty.getId());
-		}
+
+		log.debug("RpIssuerId={} IdmLookup did not execute any queries", relyingParty.getId());
 		return Optional.empty();
+	}
+
+	private static boolean isQueryDone(CpResponse cpResponse, RelyingParty relyingParty, boolean audited,
+									   IdmStatusPolicyCallback statusPolicyCallback, IdmQuery query,
+									   IdmQueryService idmService, Map<String, Object> state, IdmResult result) {
+		return audited ?
+				idmService.getAttributesAudited(relyingParty, cpResponse, query, statusPolicyCallback, state, result) :
+				idmService.getAttributes(relyingParty, cpResponse, query, statusPolicyCallback, state, result);
 	}
 
 	public static Optional<IdmQueryService> getServiceForStore(

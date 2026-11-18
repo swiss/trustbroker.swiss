@@ -18,7 +18,6 @@ package swiss.trustbroker.oidc;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -53,7 +52,7 @@ class OidcValidatorTest {
 		var relyingParty1 = givenRelyingParty("any");
 		var ex = assertThrows(OAuth2AuthenticationException.class, () ->
 				OidcValidator.validateClaimsProviderMapping(relyingParty1, null, "error_uri"));
-		assertTrue(ex.getMessage().contains("Missing ClaimsProviderMappings for RelyingParty"));
+		assertEquals("unauthorized client", ex.getError().getDescription());
 
 		// CP is not configured for RP
 		var cpId1 = "cpId1";
@@ -63,7 +62,7 @@ class OidcValidatorTest {
 							.build();
 		ex = assertThrows(OAuth2AuthenticationException.class, () ->
 				OidcValidator.validateClaimsProviderMapping(relyingParty2, cp, "error_uri"));
-		assertTrue(ex.getMessage().contains("Missing ClaimsProviderMapping for ClaimParty"));
+		assertEquals("unauthorized client", ex.getError().getDescription());
 
 		// CP configured for RP
 		assertDoesNotThrow(() -> OidcValidator.validateClaimsProviderMapping(relyingParty2, ClaimsParty.builder().id(cpId1).build(), "error_uri"));
@@ -107,12 +106,12 @@ class OidcValidatorTest {
 		OidcClient noClient = null;
 		var ex = assertThrows(OAuth2AuthenticationException.class, () -> OidcValidator.validateInputParams(
 				noClient, registeredClient, "clientA", tokenExchangeAuth, errorUri));
-		assertTrue(ex.getMessage().contains("clientA"));
+		assertEquals("invalid request", ex.getError().getDescription());
 		assertEquals(OAuth2ErrorCodes.INVALID_REQUEST, ex.getError().getErrorCode());
 
 		ex = assertThrows(OAuth2AuthenticationException.class, () -> OidcValidator.validateInputParams(
 				oidcClient, null, "clientA", tokenExchangeAuth, errorUri));
-		assertTrue(ex.getMessage().contains("clientA"));
+		assertEquals("invalid request", ex.getError().getDescription());
 		assertEquals(OAuth2ErrorCodes.INVALID_REQUEST, ex.getError().getErrorCode());
 
 		// Missing TOKEN_EXCHANGE grant type
@@ -123,7 +122,7 @@ class OidcValidatorTest {
 											   .build();
 		ex = assertThrows(OAuth2AuthenticationException.class, () -> OidcValidator.validateInputParams(
 				oidcClient, missingGrantType, "clientA", tokenExchangeAuth, errorUri));
-		assertTrue(ex.getMessage().contains("clientA"));
+		assertEquals("invalid grant", ex.getError().getDescription());
 		assertEquals(OAuth2ErrorCodes.INVALID_GRANT, ex.getError().getErrorCode());
 
 		// requested_token_type = JWT but access token format is NOT SELF_CONTAINED

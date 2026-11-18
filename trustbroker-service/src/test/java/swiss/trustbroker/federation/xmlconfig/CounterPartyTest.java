@@ -21,8 +21,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import swiss.trustbroker.util.DefaultHandler;
 
+@SpringBootTest(classes = { DefaultHandler.class })
 class CounterPartyTest {
+
+	@Autowired
+	private DefaultHandler defaultHandler;
 
 	@Test
 	void isWsTrustEnabled() {
@@ -30,10 +37,10 @@ class CounterPartyTest {
 		var cp = ClaimsParty.builder().id("cp1").build();
 		assertFalse(cp.isWsTrustEnabled(true, null));
 		// disabled with disabled base:
-		var rp = ClaimsParty.builder().id("rp1").build();
+		var rp = RelyingParty.builder().id("rp1").build();
 		assertFalse(rp.isWsTrustEnabled(true, cp));
 		// enabled:
-		cp.setWsTrust(new WsTrust());
+		cp.setWsTrust(givenWsTrust());
 		assertTrue(cp.isWsTrustEnabled(true, null));
 		// enabled base not default:
 		assertFalse(rp.isWsTrustEnabled(true, cp));
@@ -45,7 +52,7 @@ class CounterPartyTest {
 		// globally disabled:
 		assertFalse(rp.isWsTrustEnabled(false, cp));
 		// override base:
-		rp.setWsTrust(new WsTrust());
+		rp.setWsTrust(givenWsTrust());
 		rp.getWsTrust().setEnabled(false);
 		assertFalse(rp.isWsTrustEnabled(true, cp));
 	}
@@ -61,11 +68,11 @@ class CounterPartyTest {
 		assertFalse(cp.isValidInboundBinding(WsTrustBinding.ISSUE, renew, null));
 		assertTrue(cp.isValidInboundBinding(WsTrustBinding.ISSUE, all, null));
 		// disabled with disabled base:
-		var rp = ClaimsParty.builder().id("rp1").build();
+		var rp = RelyingParty.builder().id("rp1").build();
 		assertFalse(rp.isValidInboundBinding(WsTrustBinding.ISSUE, null, cp));
 		assertTrue(rp.isValidInboundBinding(WsTrustBinding.ISSUE, all, cp));
 		// enabled:
-		cp.setWsTrust(new WsTrust());
+		cp.setWsTrust(givenWsTrust());
 		cp.getWsTrust().setSupportedBindings(renew);
 		assertFalse(cp.isValidInboundBinding(WsTrustBinding.ISSUE, null, null));
 		cp.getWsTrust().setSupportedBindings(all);
@@ -76,8 +83,57 @@ class CounterPartyTest {
 		cp.getWsTrust().setCounterPartyDefault(true);
 		assertTrue(rp.isValidInboundBinding(WsTrustBinding.ISSUE, null, cp));
 		// override base:
-		rp.setWsTrust(new WsTrust());
+		rp.setWsTrust(givenWsTrust());
 		rp.getWsTrust().setSupportedBindings(renew);
 		assertFalse(rp.isValidInboundBinding(WsTrustBinding.ISSUE, null, cp));
+	}
+
+	@Test
+	void isOidcEnabled() {
+		var rp = RelyingParty.builder().id("rp1").build();
+		// missing
+		assertFalse(rp.isOidcEnabled(true));
+		// configured
+		rp.setOidc(givenOidc());
+		assertTrue(rp.isOidcEnabled(true));
+		assertFalse(rp.isOidcEnabled(false));
+		rp.getOidc().setEnabled(false);
+		assertFalse(rp.isOidcEnabled(true));
+		assertFalse(rp.isOidcEnabled(false));
+	}
+
+	@Test
+	void isSamlEnabled() {
+		var rp = RelyingParty.builder().id("rp1").build();
+		// missing - true if OIDC is not enabled
+		assertTrue(rp.isSamlEnabled(true));
+		rp.setOidc(givenOidc());
+		assertFalse(rp.isSamlEnabled(true));
+		rp.setOidc(null);
+		// configured
+		rp.setSaml(givenSaml());
+		assertTrue(rp.isSamlEnabled(true));
+		assertFalse(rp.isSamlEnabled(false));
+		rp.getSaml().setEnabled(false);
+		assertFalse(rp.isSamlEnabled(true));
+		assertFalse(rp.isSamlEnabled(false));
+	}
+
+	private WsTrust givenWsTrust() {
+		var result = new WsTrust();
+		defaultHandler.applyDefaultValues(result);
+		return result;
+	}
+
+	private Oidc givenOidc() {
+		var result = new Oidc();
+		defaultHandler.applyDefaultValues(result);
+		return result;
+	}
+
+	private Saml givenSaml() {
+		var result = new Saml();
+		defaultHandler.applyDefaultValues(result);
+		return result;
 	}
 }

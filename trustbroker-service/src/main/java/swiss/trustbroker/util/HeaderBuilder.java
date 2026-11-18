@@ -27,7 +27,9 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
+import swiss.trustbroker.common.dto.AcceptedUrl;
 import swiss.trustbroker.config.TrustBrokerProperties;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 
 @AllArgsConstructor(staticName = "of")
 @Slf4j
@@ -122,14 +124,15 @@ public class HeaderBuilder {
 			frameAncestors.addAll(ownOrigins);
 		}
 		var appliedFrameAncestors = new ArrayList<String>();
-		csp(csp, frameAncestors, appliedFrameAncestors);
+		Set<AcceptedUrl> acceptedFrameAncestors = AcUrl.asAcceptedUrlSet(frameAncestors);
+		csp(csp, acceptedFrameAncestors, appliedFrameAncestors);
 		frameAncestorHandler.appliedFrameAncestors(appliedFrameAncestors);
 		frameOptions(appliedFrameAncestors, frameOptions);
 		return this;
 	}
 
 	public HeaderBuilder oidc3pCookieOptions(String origin, String perimeterUrl) {
-		Set<String> ancestors = origin != null ? Set.of(origin) : Set.of();
+		Set<AcceptedUrl> ancestors = origin != null ? Set.of(AcUrl.of(origin)) : Set.of();
 		var csp = appendFrameAncestors(null, ancestors, null);
 		csp = csp + " " + perimeterUrl;
 		setHeader(CONTENT_SECURITY_POLICY, csp);
@@ -154,7 +157,7 @@ public class HeaderBuilder {
 		return csp(properties.getCsp().getFallback(), Collections.emptySet(), null);
 	}
 
-	private HeaderBuilder csp(String csp, Set<String> allowedFrameAncestors, List<String> appliedFrameAncestors) {
+	private HeaderBuilder csp(String csp, Set<AcceptedUrl> allowedFrameAncestors, List<String> appliedFrameAncestors) {
 		if (StringUtils.isNotEmpty(csp) || !allowedFrameAncestors.isEmpty()) {
 			csp = appendFrameAncestors(csp, allowedFrameAncestors, appliedFrameAncestors);
 			setHeader(CONTENT_SECURITY_POLICY, csp);
@@ -162,7 +165,7 @@ public class HeaderBuilder {
 		return this;
 	}
 
-	private String appendFrameAncestors(String csp, Set<String> allowedFrameAncestors, List<String> appliedFrameAncestors) {
+	private String appendFrameAncestors(String csp, Set<AcceptedUrl> allowedFrameAncestors, List<String> appliedFrameAncestors) {
 		if (allowedFrameAncestors.isEmpty()) {
 			return csp;
 		}

@@ -57,11 +57,32 @@ public class SecurityPolicies implements Serializable {
 	private Boolean requireSignedAuthnRequest;
 
 	/**
-	 * Allow to disable signature check for incoming LogoutRequests. If not set, falls back to <code>requireSignedAuthnRequest</code>.
+	 * Allow to disable destination check for incoming SAML AuthnRequests.
 	 * <br/>
+	 * Overrides global SecurityChecks
+	 *
+	 * @since 1.16.0
+	 */
+	@XmlAttribute(name = "requireAuthnRequestDestination")
+	private Boolean requireAuthnRequestDestination;
+
+	/**
+	 * Allow to disable signature check for incoming LogoutRequests.
+	 * <br/>
+	 * If not set, falls back to <code>requireSignedAuthnRequest</code>.
 	 */
 	@XmlAttribute(name = "requireSignedLogoutRequest")
 	private Boolean requireSignedLogoutRequest;
+
+	/**
+	 * Allow to disable destination check for incoming SAML LogoutRequests.
+	 * <br/>
+	 * Overrides global SecurityChecks
+	 *
+	 * @since 1.16.0
+	 */
+	@XmlAttribute(name = "requireLogoutRequestDestination")
+	private Boolean requireLogoutRequestDestination;
 
 	/**
 	 * Allow to disable signature check for outgoing SLO notification LogoutRequests.
@@ -84,6 +105,16 @@ public class SecurityPolicies implements Serializable {
 	 */
 	@XmlAttribute(name = "requireSignedResponse")
 	private Boolean requireSignedResponse;
+
+	/**
+	 * Allow to disable destination check for incoming SAML responses from CP.
+	 * <br/>
+	 * Overrides global SecurityChecks
+	 *
+	 * @since 1.16.0
+	 */
+	@XmlAttribute(name = "requireResponseDestination")
+	private Boolean requireResponseDestination;
 
 	/**
 	 * Allow to disable required encrypted Assertion when the EncryptionKeystore is configured.
@@ -174,6 +205,8 @@ public class SecurityPolicies implements Serializable {
 	/**
 	 * Validate HTTP request headers. Currently <code>referer</code> and <code>origin</code> can be validated against the
 	 * AcWhitelist of an RP.
+	 * <br/>
+	 * Logical AND with global SecurityChecks
 	 *
 	 * @since 1.12.0
 	 */
@@ -202,7 +235,7 @@ public class SecurityPolicies implements Serializable {
 	/**
 	 * Require signed assertion in WS-Trust ISSUE.
 	 * <br/>
-	 * Default: fallback to default (global default is true)
+	 * Overrides global SecurityChecks
 	 *
 	 * @since 1.13.0
 	 * @deprecated Transition feature
@@ -214,7 +247,7 @@ public class SecurityPolicies implements Serializable {
 	/**
 	 * Require signed request in WS-Trust ISSUE.
 	 * <br/>
-	 * Default: fallback to default
+	 * Overrides global SecurityChecks
 	 *
 	 * @since 1.13.0
 	 */
@@ -224,10 +257,9 @@ public class SecurityPolicies implements Serializable {
 	/**
 	 * WS-Trust ISSUE requires timestamp.
 	 * <br/>
-	 * Default: true
+	 * Overrides global SecurityChecks (was true in 1.15.0 thus the global SecurityChecks was never used)
 	 * @since 1.15.0
 	 */
-	@Default(value = "true")
 	@XmlAttribute(name = "wsTrustIssueRequireTimestamp")
 	private Boolean wsTrustIssueRequireTimestamp;
 
@@ -248,7 +280,7 @@ public class SecurityPolicies implements Serializable {
 	/**
 	 * List of allowed message signature algorithms. (Empty list means no restriction.)
 	 * <br/>
-	 * Default: Global default
+	 * Overrides global SecurityChecks
 	 * @since 1.15.0
 	 */
 	@XmlElement(name = "AllowedSignatureAlgorithms")

@@ -274,7 +274,8 @@ public class AuthenticationService {
 			log.error("No configuration for cpId={} for rpIssuerId={} and referer={}", claimsProviderUrn, rpIssuer, referer);
 			return null;
 		}
-		var ssoStateData = ssoService.findValidStateFromCookies(relyingParty, claimsParty, httpRequest.getCookies());
+		var ssoStateData = ssoService.findValidStateFromCookies(relyingParty, claimsParty,
+				stateDataByAuthnReq, httpRequest.getCookies());
 		if (ssoStateData.isPresent()) {
 			var operation = ssoService.skipCpAuthentication(claimsParty, relyingParty,
 					stateDataByAuthnReq, ssoStateData.get());

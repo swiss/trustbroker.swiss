@@ -22,9 +22,13 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.EnumUtils;
+import org.springframework.core.env.Environment;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.stereotype.Component;
 import swiss.trustbroker.common.exception.TechnicalException;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProviderSetup;
 import swiss.trustbroker.federation.xmlconfig.Default;
@@ -35,13 +39,18 @@ import swiss.trustbroker.federation.xmlconfig.RelyingPartySetup;
  *
  * @see Default
  */
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor
 @Slf4j
-public class DefaultUtil {
+@Component
+public class DefaultHandler {
 
 	private static final Set<String> ALLOWED_PACKAGES = Set.of(Default.class.getPackageName());
 
-	public static void applyCpDefaults(ClaimsProviderSetup claimsProviderSetup) {
+	private final Environment environment;
+
+	private final ExpressionParser parser = new SpelExpressionParser();
+
+	public void applyCpDefaults(ClaimsProviderSetup claimsProviderSetup) {
 		Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
 		if (claimsProviderSetup != null && claimsProviderSetup.getClaimsParties() != null) {
 			for (var cp : claimsProviderSetup.getClaimsParties()) {
@@ -51,7 +60,7 @@ public class DefaultUtil {
 		}
 	}
 
-	public static void applyRpDefaults(RelyingPartySetup relyingPartySetup) {
+	public void applyRpDefaults(RelyingPartySetup relyingPartySetup) {
 		Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
 		if (relyingPartySetup != null && relyingPartySetup.getRelyingParties() != null) {
 			for (var rp : relyingPartySetup.getRelyingParties()) {
@@ -61,7 +70,13 @@ public class DefaultUtil {
 		}
 	}
 
-	public static void applyDefaultValues(Object obj, Set<Object> visited) {
+	// mainly intended for tests that rely on or validate the defaults provided by @Default
+	public void applyDefaultValues(Object obj) {
+		Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+		applyDefaultValues(obj, visited);
+	}
+
+	private void applyDefaultValues(Object obj, Set<Object> visited) {
 		if (obj == null || visited.contains(obj)) {
 			return;
 		}
@@ -85,7 +100,7 @@ public class DefaultUtil {
 	}
 
 	@SuppressWarnings("java:S3011")
-	private static void processField(Object obj, Set<Object> visited, Field field) {
+	private void processField(Object obj, Set<Object> visited, Field field) {
 		try {
 			Object value = getValue(obj, field);
 			if (value == null) {
@@ -117,31 +132,57 @@ public class DefaultUtil {
 		}
 	}
 
-	private static void processArray(Set<Object> visited, Object value) {
+	private void processArray(Set<Object> visited, Object value) {
 		var len = Array.getLength(value);
 		for (var i = 0; i < len; i++) {
 			applyDefaultValues(Array.get(value, i), visited);
 		}
 	}
 
-	private static void processCollections(Set<Object> visited, Collection<?> col) {
+	private void processCollections(Set<Object> visited, Collection<?> col) {
 		for (var element : col) {
 			applyDefaultValues(element, visited);
 		}
 	}
 
 	@SuppressWarnings("java:S3011")
-	private static Object getValue(Object obj, Field field) throws IllegalAccessException {
+	private Object getValue(Object obj, Field field) throws IllegalAccessException {
 		field.setAccessible(true);
 		var value = field.get(obj);
 		var def = field.getAnnotation(Default.class);
 		if (value == null && def != null) {
-			var converted = convert(def.value(), field.getType());
-			log.trace("Setting default {}.{}='{}'", obj.getClass().getName(), field.getName(), converted);
+			var converted = evaluate(def, field.getType());
+			log.trace("Setting default {}.{}='{}' from {}", obj.getClass().getName(), field.getName(), converted, def);
 			field.set(obj, converted);
 			value = converted;
 		}
 		return value;
+	}
+
+	// note that Spring StringValueResolver implementations are internal and cannot be injected.
+	Object evaluate(Default def, Class<?> type) {
+		return switch (def.format()) {
+			case VALUE -> convert(def.value(), type);
+			case PROPERTY -> resolveProperty(def.value(), def.fallback(), type);
+			case EXPRESSION -> evaluateExpression(def.value(), type);
+		};
+	}
+
+	private Object evaluateExpression(String value, Class<?> type) {
+		var resolved = environment.resolvePlaceholders(value);
+		log.trace("Resolved expression='{}' to value='{}'", value, resolved);
+		var result = parser.parseExpression(resolved).getValue(type);
+		log.trace("Evaluated resolved expression='{}' to value='{}'", value,  result);
+		return result;
+	}
+
+	private Object resolveProperty(String value, String fallback, Class<?> type) {
+		var resolved = environment.getProperty(value);
+		log.trace("Resolved property='{}' to value='{}' fallback='{}'", value, resolved, fallback);
+		if (resolved == null) {
+			resolved = fallback;
+		}
+		return convert(resolved, type);
 	}
 
 	private static boolean isSimpleType(Class<?> type) {
@@ -153,6 +194,7 @@ public class DefaultUtil {
 				|| type.isEnum();
 	}
 
+	@SuppressWarnings("unchecked")
 	private static Object convert(String value, Class<?> type) {
 		if (type == Boolean.class || type == boolean.class) {
 			return Boolean.valueOf(value);
@@ -165,6 +207,9 @@ public class DefaultUtil {
 		}
 		if (type == String.class) {
 			return value;
+		}
+		if (type.isEnum()) {
+			return EnumUtils.getEnum((Class<? extends Enum>) type, value);
 		}
 		throw new TechnicalException(String.format("Unsupported type: %s", type.getName()));
 	}

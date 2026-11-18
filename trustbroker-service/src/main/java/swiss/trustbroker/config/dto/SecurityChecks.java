@@ -61,6 +61,33 @@ public class SecurityChecks {
 	private boolean requireSignedAuthnRequest = true;
 
 	/**
+	 * Allow to disable destination check for incoming SAML AuthnRequests.
+	 * <br/>
+	 * Default: true
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private boolean requireAuthnRequestDestination = true;
+
+	/**
+	 * Allow to disable destination check for incoming SAML responses.
+	 * <br/>
+	 * Default: true
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private boolean requireResponseDestination = true;
+
+	/**
+	 * Allow to disable destination check for incoming SAML LogoutRequests.
+	 * <br/>
+	 * Default: true
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private boolean requireLogoutRequestDestination = true;
+
+	/**
 	 * Allow to just issue a warning for failing signature check for redirect binding.
 	 * <br/>
 	 * Backwards compatibility flag for transition, to be removed in an upcoming release.
@@ -104,6 +131,24 @@ public class SecurityChecks {
 	 */
 	@Builder.Default
 	private boolean requireSignedAssertion = true;
+
+	/**
+	 * Reject unsigned OIDC CP response token?
+	 * <br/>
+	 * @since 1.16.0
+	 * Default: true
+	 */
+	@Builder.Default
+	private boolean requireSignedResponseToken = true;
+
+	/**
+	 * Reject unsigned input token for token exchange?
+	 * <br/>
+	 * Default: true
+	 * @since 1.16.0
+	 */
+	@Builder.Default
+	private boolean requireSignedExchangeToken = true;
 
 	/**
 	 * Check incoming AuthnRequest at all.
@@ -257,14 +302,6 @@ public class SecurityChecks {
 	 */
 	@Builder.Default
 	private boolean validateSubjectConfirmationRecipient = true;
-
-	/**
-	 * Validate OID Logout request.
-	 * <br/>
-	 * Default: false
-	 */
-	@Builder.Default
-	private boolean validateLogoutRequest = false;
 
 	/**
 	 * Any timestamp tolerance NTP drift tolerance.

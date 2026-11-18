@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -60,7 +59,7 @@ class QoaMappingUtilTest {
 			"false,false,false",
 	}, nullValues = "null")
 	void invalidQoaExceptionTest(boolean cpEnforce, boolean rpEnforce, boolean throwEx) {
-		List<String> requestCtxClasses = Arrays.asList("class1", "class2");
+		List<String> requestCtxClasses = List.of("class1", "class2");
 		var cpQoa = Qoa.builder().enforce(cpEnforce).build();
 		var cpQoaConfig = new QoaConfig(cpQoa, "12345");
 		List<String> expectedCtxClasses = List.of("class1", "class2", "class3");
@@ -630,7 +629,7 @@ class QoaMappingUtilTest {
 	void getDowngradedClassesToNearestMaxTest() {
 		var globalMapping = givenGlobalNumericQoa();
 		var requestedQoa = List.of(SamlTestBase.Qoa.QOA_20.getName(), SamlTestBase.Qoa.QOA_30.getName(), SamlTestBase.Qoa.QOA_60.getName());
-		var outBoundQoaConf = new QoaConfig(Qoa.builder().build(), "any");
+		var outBoundQoaConf = new QoaConfig(Qoa.builder().enforce(false).build(), "any");
 
 		var ctxClass = SamlTestBase.Qoa.QOA_50.getName();
 		var	qoaOrders = Set.of(SamlTestBase.Qoa.QOA_50.getLevel());

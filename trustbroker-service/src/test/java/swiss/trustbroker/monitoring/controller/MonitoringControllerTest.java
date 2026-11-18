@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -188,7 +188,7 @@ class MonitoringControllerTest {
 
 	@ParameterizedTest
 	@MethodSource
-	void testMonitoringRpCp(Function<String, String> encoder, boolean queryParams) throws Exception {
+	void testMonitoringRpCp(UnaryOperator<String> encoder, boolean queryParams) throws Exception {
 		var rp = createRelyingParty();
 		doReturn(rp).when(relyingPartySetupService).getRelyingPartyByIssuerIdOrReferrer(RP_URN, null, true);
 		var state = createState();
@@ -210,14 +210,14 @@ class MonitoringControllerTest {
 
 	static Object[][] testMonitoringRpCp() {
 		return new Object[][] {
-				{ Function.identity(), false },
-				{ Function.identity(), true },
+				{ UnaryOperator.identity(), false },
+				{ UnaryOperator.identity(), true },
 				{ MonitoringControllerTest.encode(), false },
 				{ MonitoringControllerTest.encode(), true }
 		};
 	}
 
-	private static Function<String, String> encode() {
+	private static UnaryOperator<String> encode() {
 		return Base64Util::urlEncode;
 	}
 

@@ -26,6 +26,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import swiss.trustbroker.api.saml.service.OutputService;
 import swiss.trustbroker.common.exception.RequestDeniedException;
+import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.util.ApiSupport;
 import swiss.trustbroker.util.WebSupport;
 import swiss.trustbroker.wsfed.service.WsFedService;
@@ -40,6 +41,8 @@ public class WsFedController {
 
 	private final List<OutputService> outputServices;
 
+	private final TrustBrokerProperties trustBrokerProperties;
+
 	/**
 	 * Web traffic dispatcher handling WS-Fed requests including SAML Redirect and UI interaction
 	 *
@@ -51,6 +54,10 @@ public class WsFedController {
 	public String handleIncomingGetMessages(HttpServletRequest request, HttpServletResponse response) {
 		if (!wsFedService.isWsFed(request)) {
 			throw new RequestDeniedException(String.format("Expected WS-Fed request on path=%s", ApiSupport.WSFED_API));
+		}
+		if (!WebSupport.isNetworkAllowed("WS-Fed", trustBrokerProperties.getWsfed().getAllowedNetworks(),
+				trustBrokerProperties.getWsfed().isEnforceNetwork(), trustBrokerProperties.getNetwork(), request)) {
+			throw new RequestDeniedException("WS-Fed not allowed from client network");
 		}
 		var url = wsFedService.processWsFedRequest(request, response, outputServices);
 		return WebSupport.getViewRedirectResponse(url);

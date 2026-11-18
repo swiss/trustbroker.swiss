@@ -16,10 +16,13 @@
 package swiss.trustbroker.oidc.session;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -47,15 +50,18 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import swiss.trustbroker.common.exception.RequestDeniedException;
 import swiss.trustbroker.common.util.OidcUtil;
 import swiss.trustbroker.common.util.WebUtil;
 import swiss.trustbroker.config.TrustBrokerProperties;
 import swiss.trustbroker.config.dto.NetworkConfig;
 import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.OidcSecurityPolicies;
@@ -215,14 +221,14 @@ class OidcSessionSupportTest {
 								.id("client1")
 								.realm("realm1")
 								.redirectUris(AcWhitelist.builder()
-														 .acUrls(List.of(redirectUrl))
+								                         .acUrls(List.of(AcUrl.of(redirectUrl)))
 														 .build())
 								.build();
 		var client2 = OidcClient.builder()
 								.id("client2")
 								.realm("realm2")
 								.redirectUris(AcWhitelist.builder()
-														 .acUrls(List.of(redirectUrl))
+														 .acUrls(List.of(AcUrl.of(redirectUrl)))
 														 .build())
 								.build();
 		// ambiguous
@@ -407,6 +413,48 @@ class OidcSessionSupportTest {
 					false
 				}
 		};
+	}
+
+	@Test
+	void testCheckSessionOnFederationRedirectNotFederationPath() {
+		var request = new MockHttpServletRequest();
+		HttpExchangeSupport.begin(request, null);
+		// not a federation path -> no-op regardless of missing session
+		assertDoesNotThrow(() ->
+				OidcSessionSupport.checkSessionOnFederationRedirect("/some/other/path", request));
+	}
+
+	@Test
+	void testCheckSessionOnFederationRedirectSessionPresent() {
+		var request = new MockHttpServletRequest();
+		HttpExchangeSupport.begin(request, null);
+		var session = new TomcatSession(null);
+		HttpExchangeSupport.getRunningHttpExchange().setOidcSession(session);
+		// federation path but session is present -> no-op
+		assertDoesNotThrow(() ->
+				OidcSessionSupport.checkSessionOnFederationRedirect(ApiSupport.SPRING_SAML_AUTHENTICATE_CTXPATH + "client1", request));
+	}
+
+	@Test
+	void testCheckSessionOnFederationRedirectMissingSessionJsonClient() {
+		var request = new MockHttpServletRequest();
+		request.addHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
+		HttpExchangeSupport.begin(request, null);
+		// federation path, no session, but REST/JSON client -> logged only, no exception
+		assertDoesNotThrow(() ->
+				OidcSessionSupport.checkSessionOnFederationRedirect(ApiSupport.SPRING_SAML_AUTHENTICATE_CTXPATH + "client1", request));
+	}
+
+	@Test
+	void testCheckSessionOnFederationRedirectMissingSessionBrowserClient() {
+		var request = new MockHttpServletRequest();
+		request.addHeader(HttpHeaders.ACCEPT, MediaType.TEXT_HTML_VALUE);
+		HttpExchangeSupport.begin(request, null);
+		// federation path, no session, browser client -> denied
+		var path = ApiSupport.SPRING_SAML_AUTHENTICATE_CTXPATH + "client1";
+		var ex = assertThrows(RequestDeniedException.class,
+				() -> OidcSessionSupport.checkSessionOnFederationRedirect(path, request));
+		assertThat(ex.getInternalMessage(), containsString(path));
 	}
 
 	private static StateData givenSsoState(Set<SsoSessionParticipant> ssoParticipants) {

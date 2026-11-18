@@ -32,6 +32,7 @@ import swiss.trustbroker.config.dto.OidcProperties;
 import swiss.trustbroker.config.dto.RelyingPartyDefinitions;
 import swiss.trustbroker.federation.xmlconfig.OidcClient;
 import swiss.trustbroker.federation.xmlconfig.RelyingParty;
+import swiss.trustbroker.oidc.session.HttpExchangeSupport;
 
 @Component
 public class CustomRelyingPartyRegistrationRepository implements RelyingPartyRegistrationRepository {
@@ -98,6 +99,8 @@ public class CustomRelyingPartyRegistrationRepository implements RelyingPartyReg
 
 		var clientId = client.getId();
 		var federationId = pickFederationId(client, relyingParty);
+		var idpPostUrl = OidcCtxPropagator.addOauth2SamlPostContext(identityProvider.getAssertionConsumerService(),
+				HttpExchangeSupport.getRunningHttpRequest(), trustBrokerProperties);
 		return RelyingPartyRegistration.withRegistrationId(clientId)
 				.entityId(federationId) // Request.Issuer value on SAML side should match our SAML setup wrapping N OIDC clients
 				.signingX509Credentials(cred -> {
@@ -111,7 +114,7 @@ public class CustomRelyingPartyRegistrationRepository implements RelyingPartyReg
 						// Default is GET
 						.singleSignOnServiceBinding(Saml2MessageBinding.POST)
 						//Request.Destination
-						.singleSignOnServiceLocation(identityProvider.getAssertionConsumerService())
+						.singleSignOnServiceLocation(idpPostUrl)
 						// Response.Assertion.Signature
 						.verificationX509Credentials(cer -> cer.add(oidcIdpCredential.getTrust()))
 				)

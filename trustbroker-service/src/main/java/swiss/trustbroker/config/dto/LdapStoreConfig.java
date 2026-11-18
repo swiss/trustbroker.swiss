@@ -15,6 +15,9 @@
 
 package swiss.trustbroker.config.dto;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -35,6 +38,13 @@ public class LdapStoreConfig {
 	 * Default: false
 	 */
 	private boolean enabled;
+
+	/**
+	 * Named LDAP stores, matched against IDMQuery.name.
+	 *
+	 * @since 1.16.0
+	 */
+	private Map<String, LdapServiceEndpointConfig> stores = new LinkedHashMap<>();
 
 	/**
 	 * Default value for undefined IDMQuery.AppFilter value.

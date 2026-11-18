@@ -189,6 +189,7 @@ public abstract class AuditMapper {
 			setIfNotNull(builder::applicationName, stateData.getRpApplicationName()); // AuthnRequest only
 			setIfNotNull(builder::oidcClientId, stateData.getRpOidcClientId()); // AuthnRequest only
 			setIfNotNull(builder::profileExtId, stateData.getSelectedProfileExtId()); // IDM
+			setIfNotNull(builder::rpTxnId, stateData.getRpTxnId());
 			// RP state referrer for OIDC is always same as message referrer
 			if (stateData.getRpOidcClientId() == null) {
 				var rpReferrer = extractReferrer(stateData.getRpReferer());

@@ -6,10 +6,6 @@ spring:
   cloud:
     config:
       enabled: false
-  data:
-    ldap:
-      repositories:
-        enabled: false
   datasource:
     url: ${spring.flyway.url}/${spring.flyway.schemas}
     username: trustbroker
@@ -48,10 +44,17 @@ spring:
     scheduling:
       pool:
         size: 2
-  #ldap:
-  #  urls: ldap://localhost:1389
-  #  username: cn=admin,dc=trustbroker,dc=ch
-  #  password: secret
+  # XTB LDAP sub-system disabled by default
+  #trustbroker:
+  #  config:
+  #    ldap:
+  #      enabled: true
+  #      stores:
+  #        LDAP:
+  #          url: ldap://localhost:1389
+  #          authentication:
+  #            username: cn=admin,dc=trustbroker,dc=ch
+  #            password: secret
 
 server:
   port: 8090
@@ -107,9 +110,6 @@ management:
     port: 8091
   security:
     enabled: false
-  health:
-    ldap:
-      enabled: false
 
 client:
   ssl:
@@ -173,6 +173,9 @@ trustbroker:
       notOnOrAfterToleranceSec: 5 # NTP time drift accepted from peer for notOnOrAfter timestamps
       renewNotOnOrAfterToleranceRenewSec: 5 # accept WSTrust assertion RENEW requests after assertion expiry (if enabled)
       requireAudienceRestriction: false
+      requireAuthnRequestDestination: true # AuthnRequest Destination check, override on RP SecurityPolicies.requireAuthnRequestDestination
+      requireResponseDestination: true # Response Destination check, override on CP SecurityPolicies.requireResponseDestination
+      requireLogoutRequestDestination: true # LogoutRequest Destination check, override on RP SecurityPolicies.requireLogoutRequestDestination
       requireSignedAssertion: true
       requireSignedAuthnRequest: true
       requireSignedResponse: true
@@ -410,7 +413,51 @@ trustbroker:
     # XTB LDAP sub-system disabled by default
     #ldap:
     #  enabled: true
+    #  stores:
+    #    ldap1:
+    #      url: ldap://ldap1:389
+      #      authentication:
+      #        username: cn=admin,dc=trustbroker,dc=ch
+      #        password: "secret"
+    #    ldap2:
+    #      url: ldap://ldap2:389
+      #      authentication:
+      #        username: cn=admin,dc=trustbroker2,dc=ch
+      #        password: "secret"
     #  undefined: UNDEF
+
+    # REST service examples (disabled by default)
+    # NOTE: If trustbroker.config.rest.enabled is missing or false, REST beans are not loaded.
+    # NOTE: If enabled=true, at least one services entry must be configured.
+    #rest:
+    #  enabled: false
+    #  stores:
+    #    rest1:
+    #      baseUrl: "http://127.0.0.1:5000/scim/v2"
+    #      network:
+    #        backendConnectTimeoutSec: 10
+    #        backendResponseTimeoutSec: 30
+    #      authentication:
+    #        method: NONE
+    #      #truststore:
+    #      #  signerCert: /path/to/truststore.p12
+    #      #  password: "${REST1_TRUSTSTORE_PASS}"
+    #    rest2:
+    #      baseUrl: "http://127.0.0.1:5001/scim/v2"
+    #      network:
+    #        backendConnectTimeoutSec: 10
+    #        backendResponseTimeoutSec: 30
+    #      authentication:
+    #        method: BASIC
+    #        username: "rest2-user"
+    #        password: "${REST2_PASSWORD}"
+    #    rest3:
+    #      baseUrl: "http://127.0.0.1:5002/scim/v2"
+    #      network:
+    #        backendConnectTimeoutSec: 10
+    #        backendResponseTimeoutSec: 30
+    #      authentication:
+    #        method: BEARER
 
     attributes:
       # required attributes without predefined standard namespaces:
@@ -427,6 +474,8 @@ trustbroker:
           namespaceUri: http://trustbroker.swiss/claims/ssoSessionId
         - name: ConversationId
           namespaceUri: http://trustbroker.swiss/claims/conversationId
+        - name: RpTxnId
+          namespaceUri: http://trustbroker.swiss/claims/rpTxnId
 
     gui:
       images: ${TRUSTBROKER_HOME}/configuration/latest/images/

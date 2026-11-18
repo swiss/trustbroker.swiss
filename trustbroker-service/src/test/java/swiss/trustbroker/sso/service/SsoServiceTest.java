@@ -20,6 +20,7 @@ import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.anEmptyMap;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -53,11 +54,13 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import jakarta.servlet.http.Cookie;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -105,6 +108,7 @@ import swiss.trustbroker.config.dto.SecurityChecks;
 import swiss.trustbroker.config.dto.SsoConfig;
 import swiss.trustbroker.config.dto.SsoSessionIdPolicy;
 import swiss.trustbroker.federation.xmlconfig.AcClass;
+import swiss.trustbroker.federation.xmlconfig.AcUrl;
 import swiss.trustbroker.federation.xmlconfig.AcWhitelist;
 import swiss.trustbroker.federation.xmlconfig.ClaimsParty;
 import swiss.trustbroker.federation.xmlconfig.ClaimsProvider;
@@ -140,14 +144,6 @@ import swiss.trustbroker.util.SessionTimeConfiguration;
 @SpringBootTest
 @ContextConfiguration(classes = { SessionTimeConfiguration.class, SsoService.class, AssertionConsumerService.class})
 class SsoServiceTest {
-
-	private static final String ACS = "acs";
-
-	private static final String OIDC_PREFIX = "oidc_";
-
-	private static final String SLO_URL = "https://slo1.localdomain";
-
-	private static final String SLO_URL_ENCODED = "https&#x3a;&#x2f;&#x2f;slo1.localdomain";
 
 	private enum MockQoa {
 
@@ -203,6 +199,12 @@ class SsoServiceTest {
 		}
 	}
 
+	private static final String ACS = "acs";
+
+	private static final String OIDC_PREFIX = "oidc_";
+
+	private static final String SLO_URL = "https://slo1.localdomain";
+
 	private static final String DEVICE_ID = "deviceId";
 
 	private static final String SESSION_ID = "sessionId";
@@ -233,9 +235,9 @@ class SsoServiceTest {
 
 	private static final String ACS_URL = "https://localhost/acs";
 
-	private static final String ISS_SID_ENCODED = "&#x3f;iss&#x3d;" + ISSUER + "&amp;sid&#x3d;" + OIDC_SESSION_ID;
+	private static final String OIDC_ISS_SID = "?iss=" + ISSUER + "&sid=" + OIDC_SESSION_ID;
 
-	private static final String ACS_URL_ENCODED = "https&#x3a;&#x2f;&#x2f;localhost&#x2f;acs";
+	private static final String CP_ISS_SID = "?iss=" + CP_ISSUER_ID + "&sid=" + SESSION_ID;
 
 	private static final String PERIMETER_URL = "https://login.trustbroker.swiss/auth";
 
@@ -244,8 +246,6 @@ class SsoServiceTest {
 	private static final String MISMATCH_ACS_URL_ENCODED = "https&#x3a;&#x2f;&#x2f;other.localdomain&#x2f;acs";
 
 	private static final String DESTINATION = "https://localhost/dest";
-
-	private static final String DESTINATION_ENCODED = "https&#x3a;&#x2f;&#x2f;localhost&#x2f;dest";
 
 	private static final String PREFIXED_SSO_GROUP = SsoService.SsoCookieNameParams.XTB_COOKIE_PREFIX + SSO_GROUP;
 
@@ -478,20 +478,33 @@ class SsoServiceTest {
 	@Test
 	void findValidStateFromCookiesWithSubject() {
 		var stateData = buildStateWithSpState(SESSION_ID);
-		doReturn(Optional.of(stateData)).when(stateCacheService).findValidState(SESSION_ID, SsoService.class.getSimpleName());
+		stateData.getCpResponse().setNameId(SUBJECT_NAME_ID);
 		var cookies = new Cookie[] {
 				new Cookie(COOKIE_NAME_WITH_ALT_SUBJECT, "altSessionId"),
 				new Cookie(COOKIE_NAME, SESSION_ID)
 		};
 		var rp = buildRelyingParty(true);
 		var cp = buildClaimsParty(CP_ISSUER_ID_COOKIE);
-		var state = ssoService.findValidStateFromCookies(rp, cp, SUBJECT_NAME_ID, cookies);
+		var state = ssoService.findValidStateFromCookies(rp, cp, stateData, cookies);
 		assertThat(state.isPresent(), is(true));
 		assertThat(state.get().getId(), is(SESSION_ID));
 	}
 
 	@Test
-	void findValidStateFromCookiesWithRpCp() {
+	void findValidStateFromCookiesWithSubjectNotFound() {
+		var stateData = buildStateWithSpState(SESSION_ID);
+		stateData.getCpResponse().setNameId(SUBJECT_NAME_ID);
+		var cookies = new Cookie[] {
+				new Cookie(COOKIE_NAME_WITH_ALT_SUBJECT, "altSessionId")
+		};
+		var rp = buildRelyingParty(true);
+		var cp = buildClaimsParty(CP_ISSUER_ID_COOKIE);
+		var state = ssoService.findValidStateFromCookies(rp, cp, stateData, cookies);
+		assertThat(state.isEmpty(), is(true));
+	}
+
+	@Test
+	void findValidStateFromCookiesWithRpCpWithoutSubject() {
 		var stateData = buildStateWithSpState(SESSION_ID);
 		doReturn(Optional.of(stateData)).when(stateCacheService).findValidState(SESSION_ID, SsoService.class.getSimpleName());
 		var cookies = new Cookie[] {
@@ -502,7 +515,7 @@ class SsoServiceTest {
 		var relyingParty = buildRelyingParty(true);
 		relyingParty.getSso().setGroupName(SSO_GROUP);
 		var claimsParty = buildClaimsParty(CP_ISSUER_ID);
-		var state = ssoService.findValidStateFromCookies(relyingParty, claimsParty, cookies);
+		var state = ssoService.findValidStateFromCookies(relyingParty, claimsParty, stateData, cookies);
 		assertThat(state.isPresent(), is(true));
 		assertThat(state.get().getId(), is(SESSION_ID));
 	}
@@ -1609,6 +1622,8 @@ class SsoServiceTest {
 		ssoStateData.getLifecycle().setSsoEstablishedTime(Timestamp.from(START_INSTANT.minusSeconds(60)));
 		var result = ssoService.skipCpAuthentication(null, relyingParty, stateDataByAuthnReq, ssoStateData);
 		assertThat(result, is(SsoService.SsoSessionOperation.JOIN));
+		assertThat(stateDataByAuthnReq.getCpIssuer(), is(CP_ISSUER_ID));
+		verify(stateCacheService).save(eq(stateDataByAuthnReq), any());
 	}
 
 	@Test
@@ -2246,7 +2261,7 @@ class SsoServiceTest {
 
 		// state generated when saving new AuthnRequest
 		var acsUrl1 = "https://acs1";
-		var acWhitelist = AcWhitelist.builder().acUrls(List.of(acsUrl1)).build();
+		var acWhitelist = AcWhitelist.builder().acUrls(List.of(AcUrl.of(acsUrl1))).build();
 		var relyingParty = RelyingParty.builder().id(RELYING_PARTY_ID).acWhitelist(acWhitelist).build();
 		var claimsParty = buildClaimsParty(CP_ISSUER_ID);
 		doReturn(claimsParty).when(relyingPartySetupService).getClaimsProviderSetupByIssuerId(any(), any());
@@ -2455,7 +2470,7 @@ class SsoServiceTest {
 		var result = ssoService.buildSloNotification(relyingParty, sloResponse, null, nameId, SESSION_ID);
 
 		assertThat(result.getSlo(), is(sloResponse));
-		assertThat(result.getEncodedUrl(), is(DESTINATION_ENCODED));
+		assertThat(result.getUrl(), is(DESTINATION));
 		assertThat(result.getSamlLogoutRequest(), is(not(nullValue())));
 		assertThat(result.getSamlRelayState(), is(not(nullValue())));
 
@@ -2496,8 +2511,8 @@ class SsoServiceTest {
 		var result = ssoService.buildSloNotification(relyingParty, sloResponse, null, nameId, SESSION_ID);
 
 		assertThat(result.getSlo(), is(sloResponse));
-		assertThat(result.getEncodedUrl(),
-				is(DESTINATION_ENCODED + "&#x3f;iss&#x3d;" + CP_ISSUER_ID + "&amp;sid&#x3d;" + SESSION_ID));
+		assertThat(result.getUrl(), is(DESTINATION + CP_ISS_SID));
+		assertThat(result.getQueryParameters(), is(nullValue()));
 		assertThat(result.getSamlLogoutRequest(), is(nullValue()));
 		assertThat(result.getSamlRelayState(), is(nullValue()));
 	}
@@ -2511,7 +2526,7 @@ class SsoServiceTest {
 		var result = ssoService.buildSloNotification(relyingParty, sloResponse, null, nameId, SESSION_ID);
 
 		assertThat(result.getSlo(), is(sloResponse));
-		assertThat(result.getEncodedUrl(), is(DESTINATION_ENCODED));
+		assertThat(result.getUrl(), is(DESTINATION));
 		assertThat(result.getSamlRelayState(), is(nullValue()));
 		assertThat(result.getSamlLogoutRequest(), is(nullValue()));
 	}
@@ -2588,17 +2603,21 @@ class SsoServiceTest {
 	void addSloNotificationsRedirect() {
 		doReturn(ISSUER).when(trustBrokerProperties).getIssuer();
 		var relyingParty = buildRelyingParty(true);
-		var sloResponse = SloResponse.builder().protocol(SloProtocol.SAML2).binding(SamlBinding.REDIRECT).url(SLO_URL).build();
+		var sloResponse = SloResponse.builder()
+									 .protocol(SloProtocol.SAML2)
+									 .binding(SamlBinding.REDIRECT)
+									 .url(SLO_URL + "?foo=bar&key=value")
+									 .build();
 		relyingParty.getSso().setSloResponse(List.of(sloResponse));
 		var result = new HashMap<SloResponse, SloNotification>();
 
-		ssoService.addSloNotifications(relyingParty, SLO_URL, true, null, null, result);
+		ssoService.addSloNotifications(relyingParty, ACS_URL, true, null, null, result);
 
 		assertThat(result, is(aMapWithSize(1))); // 1 x RESPONSE
 		assertThat(result.keySet(), contains(sloResponse));
 		var expectedNotification = new SloNotification(sloResponse);
-		expectedNotification.setEncodedUrl(SLO_URL_ENCODED);
-		expectedNotification.setEncodedQueryParameters(Collections.emptyList());
+		expectedNotification.setUrl(SLO_URL);
+		expectedNotification.setQueryParameters(List.of(Pair.of("foo", "bar"), Pair.of("key", "value")));
 		assertThat(result.get(sloResponse), is(expectedNotification));
 	}
 
@@ -2649,10 +2668,14 @@ class SsoServiceTest {
 		var result = ssoService.createSloNotifications(relyingParty, DESTINATION, sessionParticipants, nameId, SESSION_ID);
 
 		assertThat(result.size(), is(4));
-		var resultUrlList = result.values().stream().map(SloNotification::getEncodedUrl).toList();
+		var resultUrlList = result.values().stream().map(SloNotification::getUrl).toList();
 		assertThat(resultUrlList,
-				containsInAnyOrder(DESTINATION_ENCODED, DESTINATION_ENCODED + "1", DESTINATION_ENCODED + "2",
-						DESTINATION_ENCODED + "3" + ISS_SID_ENCODED));
+				containsInAnyOrder(DESTINATION, DESTINATION + "1", DESTINATION + "2", DESTINATION + "3" + OIDC_ISS_SID));
+		var resultQueryParameters = result.values().stream()
+				.map(SloNotification::getQueryParameters)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toSet());
+		assertThat(resultQueryParameters, is(empty()));
 	}
 
 	@Test
@@ -2882,7 +2905,7 @@ class SsoServiceTest {
 		doReturn(maxWait).when(trustBrokerProperties).getSloNotificationTimeoutMillis();
 		var minWait = 20;
 		var expectedNotification = new SloNotification(sloResponse);
-		expectedNotification.setEncodedUrl(ACS_URL_ENCODED + ISS_SID_ENCODED);
+		expectedNotification.setUrl(ACS_URL + OIDC_ISS_SID);
 		doReturn(minWait).when(trustBrokerProperties).getSloNotificationMinWaitMillis();
 		doReturn(rp).when(relyingPartySetupService).getRelyingPartyByIssuerIdOrReferrer(RELYING_PARTY_ID, null);
 
