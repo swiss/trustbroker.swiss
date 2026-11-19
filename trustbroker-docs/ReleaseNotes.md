@@ -35,7 +35,14 @@
 
 # Released Versions
 
-## 1.16.0.20261109T110336Z (2026-11-17)
+## 1.16.0.20261119T080249Z (2026-11-19)
+
+### Dependency upgrades
+
+- Backend:
+    - Upgrade to JDK 21.0.13.1 including zulu-openjdk-alpine:21 image containing that JRE version (CVE-2026-114938).
+
+## 1.16.0.20261109T110336Z (2026-11-18)
 
 ### Dependency upgrades
 
